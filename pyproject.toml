@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xcube_gedi"
+dynamic = ["version"]
+authors = [
+  {name = "Yogesh Kumar Baljeet Singh", email = "yogesh.baljeetsingh@brockmann-consult.de"}
+]
+description = """\
+  xcube datastore for accessing Gedi datastore\
+  """
+keywords = [
+  "analysis ready data", "data science", "datacube", "xarray", "zarr", "xcube", "gedi"
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "xcube_gedi.__version__"}
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "flake8"
+]
+
+[project.urls]
+Repository = 'https://github.com/xcube-dev/xcube-gedi'
+Issues = 'https://github.com/xcube-dev/xcube-gedi/issues'
+Changelog = 'https://github.com/xcube-dev/xcube-gedi/blob/main/CHANGES.md'
