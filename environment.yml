@@ -7,6 +7,9 @@ dependencies:
   - python>=3.10
   - xarray
   - xcube >= 1.9.0
+  - pip
+  - pip:
+      - gedidb
   # for testing
   - black
   - flake8
