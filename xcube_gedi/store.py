@@ -24,16 +24,25 @@ from abc import ABC
 from typing import Tuple, Iterator, Container, Union, Any
 
 import xarray as xr
+import pandas as pd
+import gedidb as gdb
+
+
 from xcube.core.store import DataDescriptor, DataStore, DataTypeLike
 from xcube.util.jsonschema import (
     JsonObjectSchema,
+    JsonComplexSchema,
+    JsonStringSchema,
+    JsonArraySchema,
+    JsonIntegerSchema,
+    JsonNumberSchema,
 )
-
-import gedidb as gdb
-
 from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL
+from xcube_gedi.utils import convert_bbox_to_geodf
 
 _LOG = logging.getLogger("xcube.gedi")
+
+_GEDI_DATA_RETURN_TYPE = "xarray"
 
 
 class GediDataStore(DataStore, ABC):
@@ -78,22 +87,109 @@ class GediDataStore(DataStore, ABC):
     def get_open_data_params_schema(
         self, data_id: str = None, opener_id: str = None
     ) -> JsonObjectSchema:
-        raise NotImplementedError
+        available_variables = self.get_available_variables()
+        any_of_schema = [
+            JsonStringSchema(title=variable.name, description=variable.description)
+            for _, variable in available_variables.iterrows()
+        ]
+        return JsonObjectSchema(
+            properties=dict(
+                variables=JsonComplexSchema(
+                    any_of=any_of_schema,
+                    description="List of variables to retrieve from the database.",
+                ),
+                bbox=JsonArraySchema(
+                    min_items=4,
+                    max_items=4,
+                    description="(Optional) A bounding box as an array "
+                    "of [xmin, ymin, xmax, ymax]",
+                ),
+                query_type=JsonStringSchema(
+                    description="(Optional) Type of query to execute, either "
+                    "'nearest' or 'bounding_box', in case of nearest, a point "
+                    "has to be provided as well",
+                    default="bounding_box",
+                ),
+                start_time=JsonStringSchema(
+                    description="(Optional) Start date for temporal filtering "
+                    "(format: 'YYYY-MM-DD')."
+                ),
+                end_time=JsonStringSchema(
+                    description="(Optional) End date for temporal filtering "
+                    "(format: 'YYYY-MM-DD')."
+                ),
+                point=JsonArraySchema(
+                    min_items=2,
+                    max_items=2,
+                    description="(Optional) Reference point for nearest "
+                    "query, required if query_type is 'nearest' (format: "
+                    "Tuple[longitude, latitude]).",
+                ),
+                num_shots=JsonIntegerSchema(
+                    default=10,
+                    description="(Optional) Number of shots to retrieve if the "
+                    "query_type is 'nearest'",
+                ),
+                radius=JsonNumberSchema(
+                    default=0.1,
+                    description="(Optional) Radius in degrees around the point "
+                    "if the query_type is 'nearest'",
+                ),
+            ),
+            required=["variables"],
+        )
 
     def open_data(
-        self, data_id: str = None, opener_id: str = None, **open_params
+        self,
+        data_id: str = None,
+        opener_id: str = None,
+        **open_params,
     ) -> xr.Dataset:
-        vars_selected = ["agbd", "rh"]
-        return self.provider.get_data(
-            variables=vars_selected,
-            query_type="nearest",
-            point=(8.948581, 50.716982),
-            num_shots=5,
-            radius=0.1,
-            start_time="2023-01-01",
-            end_time="2024-07-02",
-            return_type="xarray",
-        )
+        assert open_params["variables"] is not None
+
+        vars_selected = open_params.get("variables")
+        bbox = open_params.get("bbox", [])
+        if len(bbox) != 0:
+            assert len(bbox) == 4, (
+                "Please provide a bbox as the following list ["
+                f"xmin, ymin, xmax, ymax], but got {bbox} "
+                "instead"
+            )
+        query_type = open_params.get("query_type", "")
+        start_time = open_params.get("start_time", None)
+        end_time = open_params.get("end_time", None)
+
+        point = open_params.get("point", None)
+        num_shots = open_params.get("num_shots", None)
+        radius = open_params.get("radius", None)
+        if point is not None:
+            assert (
+                num_shots is not None
+            ), "num_shots should be provided when using point"
+            assert radius is not None, "radius should be provided when using point"
+
+        region_of_interest = convert_bbox_to_geodf(bbox)
+
+        if query_type == "" or query_type != "nearest":
+            return self.provider.get_data(
+                variables=vars_selected,
+                query_type="bounding_box",
+                geometry=region_of_interest,
+                start_time=start_time,
+                end_time=end_time,
+                return_type=_GEDI_DATA_RETURN_TYPE,
+            )
+        else:
+            return self.provider.get_data(
+                variables=vars_selected,
+                query_type="nearest",
+                point=point,
+                num_shots=num_shots,
+                radius=radius,
+                start_time=start_time,
+                end_time=end_time,
+                return_type=_GEDI_DATA_RETURN_TYPE,
+            )
 
     def get_search_params_schema(
         cls, data_type: DataTypeLike = None
@@ -104,6 +200,15 @@ class GediDataStore(DataStore, ABC):
         self, data_type: DataTypeLike = None, **search_params
     ) -> Iterator[DataDescriptor]:
         raise NotImplementedError
+
+    def get_available_variables(
+        self,
+        product_level: str = None,
+    ) -> pd.DataFrame:
+        variables = self.provider.get_available_variables()
+        if product_level:
+            variables = variables[variables["product_level"] == product_level]
+        return variables
 
 
 # TODO:
