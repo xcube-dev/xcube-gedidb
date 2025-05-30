@@ -37,7 +37,7 @@ from xcube.util.jsonschema import (
     JsonIntegerSchema,
     JsonNumberSchema,
 )
-from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL
+from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG
 from xcube_gedi.utils import convert_bbox_to_geodf
 
 _LOG = logging.getLogger("xcube.gedi")
@@ -168,9 +168,26 @@ class GediDataStore(DataStore, ABC):
             ), "num_shots should be provided when using point"
             assert radius is not None, "radius should be provided when using point"
 
-        region_of_interest = convert_bbox_to_geodf(bbox)
+        if bbox:
+            assert query_type is None or query_type == "bounding_box", (
+                " When providing a bbox, the query_type should either be "
+                "'bounding_box' or omitted entirely, as it is the default "
+                f"value, but {query_type} was provided"
+            )
+
+        if point:
+            assert query_type == "nearest", (
+                "When providing point, the query_type should be 'nearest' but "
+                f"{query_type} was provided."
+            )
+
+        if point is not None and bbox is not None:
+            LOG.warning(
+                "Both bbox and point were provided, by default bbox " "will be used."
+            )
 
         if query_type == "" or query_type != "nearest":
+            region_of_interest = convert_bbox_to_geodf(bbox)
             return self.provider.get_data(
                 variables=vars_selected,
                 query_type="bounding_box",
@@ -219,4 +236,4 @@ class GediDataStore(DataStore, ABC):
 #  interface?
 #  3. Although the dataset that is returned is xarray, its dimensions are
 #  shot_number and profile_points. Need to clarify with stakeholders if that
-#  is okay or not.s
+#  is okay or not.
