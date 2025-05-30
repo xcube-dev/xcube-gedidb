@@ -27,4 +27,4 @@ GEDI_URL = "https://s3.gfz-potsdam.de"
 GEDI_S3_BUCKET_NAME = "dog.gedidb.gedi-l2-l4-v002"
 
 # Logging
-LOG = logging.getLogger("xcube.clms")
+LOG = logging.getLogger("xcube.gedi")
