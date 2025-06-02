@@ -26,9 +26,9 @@ from typing import Tuple, Iterator, Container, Union, Any
 import xarray as xr
 import pandas as pd
 import gedidb as gdb
+from numba.scripts.generate_lower_listing import description
 
-
-from xcube.core.store import DataDescriptor, DataStore, DataTypeLike
+from xcube.core.store import DataDescriptor, DataStore, DataTypeLike, DATASET_TYPE
 from xcube.util.jsonschema import (
     JsonObjectSchema,
     JsonComplexSchema,
@@ -38,50 +38,83 @@ from xcube.util.jsonschema import (
     JsonNumberSchema,
 )
 from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG
-from xcube_gedi.utils import convert_bbox_to_geodf
-
-_LOG = logging.getLogger("xcube.gedi")
+from xcube_gedi.utils import convert_bbox_to_geodf, assert_valid_data_type
 
 _GEDI_DATA_RETURN_TYPE = "xarray"
 
+_GEDI_LEVELS_DESCRIPTION = {
+    "L2A": "Geolocated waveform data and relative height metrics.",
+    "L2B": "Vegetation canopy cover and vertical profile metrics.",
+    "L4A": "Aboveground biomass density estimates.",
+    "L4C": "Gridded biomass estimates at global scales.",
+}
 
-class GediDataStore(DataStore, ABC):
+
+class GediDataStore(DataStore):
     """Implementation of Gedi data store ."""
 
     def __init__(self):
         self.provider = gdb.GEDIProvider(
             storage_type="s3", s3_bucket=GEDI_S3_BUCKET_NAME, url=GEDI_URL
         )
+        self.all_supported_variables: pd.DataFrame = (
+            self.provider.get_available_variables()
+        )
+        self.data_ids: list[str] = list(
+            self.all_supported_variables["product_level"].unique()
+        )
+        self.data_ids.append("all")
 
     @classmethod
     def get_data_store_params_schema(cls) -> JsonObjectSchema:
-        raise NotImplementedError
+        LOG.info("This data store can be initialized without any params")
+        return JsonObjectSchema(
+            additional_properties=False,
+        )
 
     @classmethod
     def get_data_types(cls) -> Tuple[str, ...]:
-        raise NotImplementedError
+        return (DATASET_TYPE.alias,)
 
     def get_data_types_for_data(self, data_id: str) -> Tuple[str, ...]:
-        raise NotImplementedError
+        return self.get_data_types()
 
     def get_data_ids(
         self,
         data_type: DataTypeLike = None,
         include_attrs: Container[str] | bool = False,
     ) -> Union[Iterator[str], Iterator[tuple[str, dict[str, Any]]]]:
-        raise NotImplementedError
+        assert_valid_data_type(data_type)
+        if include_attrs:
+            LOG.warning("There are no attributes for data_ids in this data store")
+        for data_id in self.data_ids:
+            if include_attrs:
+                yield data_id, {}
+            else:
+                yield data_id
 
     def has_data(self, data_id: str, data_type: str = None) -> bool:
-        raise NotImplementedError
+        assert_valid_data_type(data_type)
+        if data_id in self.data_ids:
+            return True
+        return False
 
     def describe_data(
         self, data_id: str, data_type: DataTypeLike = None
     ) -> DataDescriptor:
-        raise NotImplementedError
+        assert_valid_data_type(data_type)
+        if data_id not in self.data_ids:
+            LOG.warning("No such data_id found.")
+            return None
+
+        metadata = dict(description=_GEDI_LEVELS_DESCRIPTION.get(data_id))
+        # TODO: Actually this wont work: use NASA CMR instead
+        return DataDescriptor(data_id, data_type, **metadata)
 
     def get_data_opener_ids(
         self, data_id: str = None, data_type: DataTypeLike = None
     ) -> Tuple[str, ...]:
+        # Not needed: explain why?
         raise NotImplementedError
 
     def get_open_data_params_schema(
@@ -96,6 +129,11 @@ class GediDataStore(DataStore, ABC):
             properties=dict(
                 variables=JsonComplexSchema(
                     any_of=any_of_schema,
+                    enum=list(
+                        available_variables.index
+                        + ": "
+                        + available_variables.description
+                    ),
                     description="List of variables to retrieve from the database.",
                 ),
                 bbox=JsonArraySchema(
@@ -222,10 +260,11 @@ class GediDataStore(DataStore, ABC):
         self,
         product_level: str = None,
     ) -> pd.DataFrame:
-        variables = self.provider.get_available_variables()
         if product_level:
-            variables = variables[variables["product_level"] == product_level]
-        return variables
+            return self.all_supported_variables[
+                self.all_supported_variables["product_level"] == product_level
+            ]
+        return self.all_supported_variables
 
 
 # TODO:
