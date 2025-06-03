@@ -26,5 +26,7 @@ DATA_STORE_ID = "gedi"
 GEDI_URL = "https://s3.gfz-potsdam.de"
 GEDI_S3_BUCKET_NAME = "dog.gedidb.gedi-l2-l4-v002"
 
+NASA_CMR_URL = "https://cmr.earthdata.nasa.gov/search/collections.json?"
+
 # Logging
 LOG = logging.getLogger("xcube.gedi")

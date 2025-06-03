@@ -19,14 +19,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import logging
-from abc import ABC
 from typing import Tuple, Iterator, Container, Union, Any
 
+import requests
 import xarray as xr
+import numpy as np
 import pandas as pd
 import gedidb as gdb
-from numba.scripts.generate_lower_listing import description
 
 from xcube.core.store import DataDescriptor, DataStore, DataTypeLike, DATASET_TYPE
 from xcube.util.jsonschema import (
@@ -37,7 +36,7 @@ from xcube.util.jsonschema import (
     JsonIntegerSchema,
     JsonNumberSchema,
 )
-from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG
+from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG, NASA_CMR_URL
 from xcube_gedi.utils import convert_bbox_to_geodf, assert_valid_data_type
 
 _GEDI_DATA_RETURN_TYPE = "xarray"
@@ -47,6 +46,13 @@ _GEDI_LEVELS_DESCRIPTION = {
     "L2B": "Vegetation canopy cover and vertical profile metrics.",
     "L4A": "Aboveground biomass density estimates.",
     "L4C": "Gridded biomass estimates at global scales.",
+}
+
+_GEDI_CONCEPT_IDS = {
+    "L2A": "C2142771958-LPCLOUD",
+    "L2B": "C2142776747-LPCLOUD",
+    "L4A": "C2237824918-ORNL_CLOUD",
+    "L4C": "C3049900163-ORNL_CLOUD",
 }
 
 
@@ -104,11 +110,16 @@ class GediDataStore(DataStore):
     ) -> DataDescriptor:
         assert_valid_data_type(data_type)
         if data_id not in self.data_ids:
-            LOG.warning("No such data_id found.")
-            return None
+            raise ValueError("No such data_id found.")
+        if data_id == "all":
+            raise ValueError(
+                "all is just a placeholder to allow users to "
+                "choose variables from various levels into a "
+                "single data cube. Please provide a valid data_id (level_name) "
+                "instead"
+            )
 
-        metadata = dict(description=_GEDI_LEVELS_DESCRIPTION.get(data_id))
-        # TODO: Actually this wont work: use NASA CMR instead
+        metadata = dict(**self._get_gedi_metadata(_GEDI_CONCEPT_IDS.get(data_id)))
         return DataDescriptor(data_id, data_type, **metadata)
 
     def get_data_opener_ids(
@@ -266,13 +277,32 @@ class GediDataStore(DataStore):
             ]
         return self.all_supported_variables
 
+    @staticmethod
+    def _get_gedi_metadata(concept_id):
+        url = f"{NASA_CMR_URL}concept_id={concept_id}"
+        response = requests.get(url)
 
-# TODO:
-#  1. Clarify what to use for data_ids as we can only access the
-#  variables through the gedidb api.
-#  2. What to do for list_data_ids()? Do we return variables or do we need a
-#  new method for it? Does it seem it is deviating from the datastore
-#  interface?
-#  3. Although the dataset that is returned is xarray, its dimensions are
-#  shot_number and profile_points. Need to clarify with stakeholders if that
-#  is okay or not.
+        if response.status_code != 200:
+            raise Exception(f"Failed to retrieve metadata: HTTP {response.status_code}")
+
+        data = response.json()
+        entries = data.get("feed", {}).get("entry", [])
+
+        if not entries:
+            raise Exception("No entries found for the specified dataset.")
+
+        entry = entries[0]
+
+        bbox = entry.get("boxes", [None])[0]
+        if bbox:
+            x = bbox.split(" ")
+            bbox = np.array(x, dtype=float)
+        else:
+            bbox = None
+
+        time_start = entry.get("time_start")
+        time_end = entry.get("time_end")
+        time_range = (time_start, time_end)
+
+        crs = "EPSG:4326 (WGS 84)"
+        return {"bbox": tuple(bbox), "time_range": tuple(time_range), "crs": crs}
