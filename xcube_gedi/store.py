@@ -26,6 +26,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 import gedidb as gdb
+from requests import RequestException
 
 from xcube.core.store import DataDescriptor, DataStore, DataTypeLike, DATASET_TYPE
 from xcube.util.jsonschema import (
@@ -113,7 +114,7 @@ class GediDataStore(DataStore):
             raise ValueError("No such data_id found.")
         if data_id == "all":
             raise ValueError(
-                "all is just a placeholder to allow users to "
+                "`all` is just a placeholder to allow users to "
                 "choose variables from various levels into a "
                 "single data cube. Please provide a valid data_id (level_name) "
                 "instead"
@@ -125,25 +126,27 @@ class GediDataStore(DataStore):
     def get_data_opener_ids(
         self, data_id: str = None, data_type: DataTypeLike = None
     ) -> Tuple[str, ...]:
-        # Not needed: explain why?
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Since we use gedidb to request the data, which has already been "
+            "converted from HDF5 to TileDB arrays, there are no data opener "
+            "IDs available. The open_data() method always returns an xarray object."
+        )
 
     def get_open_data_params_schema(
         self, data_id: str = None, opener_id: str = None
     ) -> JsonObjectSchema:
-        available_variables = self.get_available_variables()
         any_of_schema = [
             JsonStringSchema(title=variable.name, description=variable.description)
-            for _, variable in available_variables.iterrows()
+            for _, variable in self.all_supported_variables.iterrows()
         ]
         return JsonObjectSchema(
             properties=dict(
                 variables=JsonComplexSchema(
                     any_of=any_of_schema,
                     enum=list(
-                        available_variables.index
+                        self.all_supported_variables.index
                         + ": "
-                        + available_variables.description
+                        + self.all_supported_variables.description
                     ),
                     description="List of variables to retrieve from the database.",
                 ),
@@ -190,13 +193,29 @@ class GediDataStore(DataStore):
 
     def open_data(
         self,
-        data_id: str = None,
+        data_id: str,
         opener_id: str = None,
         **open_params,
     ) -> xr.Dataset:
+        assert data_id in self.data_ids
+
         assert open_params["variables"] is not None
 
         vars_selected = open_params.get("variables")
+        if data_id == "all":
+            possible_variables = list(self.all_supported_variables.index)
+        else:
+            possible_variables = list(self._get_available_variables(data_id).index)
+        invalid_vars = [
+            elem for elem in vars_selected if elem not in possible_variables
+        ]
+
+        if len(invalid_vars) > 0:
+            raise ValueError(
+                f"The following variable(s) are invalid: {invalid_vars} for "
+                f"data_id: {data_id}"
+            )
+
         bbox = open_params.get("bbox", [])
         if len(bbox) != 0:
             assert len(bbox) == 4, (
@@ -217,22 +236,23 @@ class GediDataStore(DataStore):
             ), "num_shots should be provided when using point"
             assert radius is not None, "radius should be provided when using point"
 
+        if point is not None and bbox is not None:
+            LOG.warning(
+                "Both bbox and point were provided, by default bbox will be used."
+            )
+            query_type = "bounding_box"
+
         if bbox:
-            assert query_type is None or query_type == "bounding_box", (
+            assert query_type == "" or query_type == "bounding_box", (
                 " When providing a bbox, the query_type should either be "
                 "'bounding_box' or omitted entirely, as it is the default "
                 f"value, but {query_type} was provided"
             )
 
-        if point:
+        if point and not bbox:
             assert query_type == "nearest", (
                 "When providing point, the query_type should be 'nearest' but "
                 f"{query_type} was provided."
-            )
-
-        if point is not None and bbox is not None:
-            LOG.warning(
-                "Both bbox and point were provided, by default bbox " "will be used."
             )
 
         if query_type == "" or query_type != "nearest":
@@ -260,36 +280,28 @@ class GediDataStore(DataStore):
     def get_search_params_schema(
         cls, data_type: DataTypeLike = None
     ) -> JsonObjectSchema:
-        raise NotImplementedError
+        return JsonObjectSchema()
 
     def search_data(
         self, data_type: DataTypeLike = None, **search_params
     ) -> Iterator[DataDescriptor]:
-        raise NotImplementedError
-
-    def get_available_variables(
-        self,
-        product_level: str = None,
-    ) -> pd.DataFrame:
-        if product_level:
-            return self.all_supported_variables[
-                self.all_supported_variables["product_level"] == product_level
-            ]
-        return self.all_supported_variables
+        raise NotImplementedError("search_data() operation is not supported yet")
 
     @staticmethod
-    def _get_gedi_metadata(concept_id):
+    def _get_gedi_metadata(concept_id: str) -> dict[str, tuple[Any]]:
         url = f"{NASA_CMR_URL}concept_id={concept_id}"
         response = requests.get(url)
 
         if response.status_code != 200:
-            raise Exception(f"Failed to retrieve metadata: HTTP {response.status_code}")
+            raise RequestException(
+                f"Failed to retrieve metadata: HTTP" f" {response.status_code}"
+            )
 
         data = response.json()
         entries = data.get("feed", {}).get("entry", [])
 
         if not entries:
-            raise Exception("No entries found for the specified dataset.")
+            raise ValueError("No entries found for the specified dataset.")
 
         entry = entries[0]
 
@@ -304,5 +316,12 @@ class GediDataStore(DataStore):
         time_end = entry.get("time_end")
         time_range = (time_start, time_end)
 
-        crs = "EPSG:4326 (WGS 84)"
-        return {"bbox": tuple(bbox), "time_range": tuple(time_range), "crs": crs}
+        return {"bbox": tuple(bbox), "time_range": tuple(time_range)}
+
+    def _get_available_variables(
+        self,
+        product_level: str,
+    ) -> pd.DataFrame:
+        return self.all_supported_variables[
+            self.all_supported_variables["product_level"] == product_level
+        ]
