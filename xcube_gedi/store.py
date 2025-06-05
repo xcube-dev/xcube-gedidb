@@ -49,6 +49,9 @@ _GEDI_LEVELS_DESCRIPTION = {
     "L4C": "Gridded biomass estimates at global scales.",
 }
 
+
+# These concept IDs are required by the NASA CMR API to return the metadata
+# for the requested processed level GEDI data
 _GEDI_CONCEPT_IDS = {
     "L2A": "C2142771958-LPCLOUD",
     "L2B": "C2142776747-LPCLOUD",
