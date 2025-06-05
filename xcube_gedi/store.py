@@ -84,7 +84,9 @@ class GediDataStore(DataStore):
         return (DATASET_TYPE.alias,)
 
     def get_data_types_for_data(self, data_id: str) -> Tuple[str, ...]:
-        return self.get_data_types()
+        if data_id in self.data_ids:
+            return self.get_data_types()
+        raise ValueError("Invalid data_id provided")
 
     def get_data_ids(
         self,
@@ -135,18 +137,18 @@ class GediDataStore(DataStore):
     def get_open_data_params_schema(
         self, data_id: str = None, opener_id: str = None
     ) -> JsonObjectSchema:
-        any_of_schema = [
-            JsonStringSchema(title=variable.name, description=variable.description)
-            for _, variable in self.all_supported_variables.iterrows()
-        ]
+        if opener_id:
+            LOG.warning("opener_id will be ignored")
+        if data_id:
+            possible_variables = self._get_available_variables(data_id)
+        else:
+            possible_variables = self.all_supported_variables
+
         return JsonObjectSchema(
             properties=dict(
-                variables=JsonComplexSchema(
-                    any_of=any_of_schema,
+                variables=JsonArraySchema(
                     enum=list(
-                        self.all_supported_variables.index
-                        + ": "
-                        + self.all_supported_variables.description
+                        possible_variables.index + ": " + possible_variables.description
                     ),
                     description="List of variables to retrieve from the database.",
                 ),
@@ -199,7 +201,7 @@ class GediDataStore(DataStore):
     ) -> xr.Dataset:
         assert data_id in self.data_ids
 
-        assert open_params["variables"] is not None
+        assert open_params.get("variables", None) is not None, "Variables are missing."
 
         vars_selected = open_params.get("variables")
         if data_id == "all":
