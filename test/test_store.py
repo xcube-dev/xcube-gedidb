@@ -226,7 +226,7 @@ class GediDataStoreTest(unittest.TestCase):
             variables=["rh"],
             point=(-112.15, 50.69),
             num_shots=5,
-            radius=0.05,
+            radius=0.1,
             query_type="nearest",
             start_time="2023-01-26",
             end_time="2023-01-30",

@@ -235,21 +235,20 @@ class GediDataStore(DataStore):
                 num_shots is not None
             ), "num_shots should be provided when using point"
             assert radius is not None, "radius should be provided when using point"
-
-        if point is not None and bbox is not None:
+        if point is not None and len(bbox) != 0:
             LOG.warning(
                 "Both bbox and point were provided, by default bbox will be used."
             )
             query_type = "bounding_box"
 
-        if bbox:
+        if len(bbox) > 0:
             assert query_type == "" or query_type == "bounding_box", (
                 " When providing a bbox, the query_type should either be "
                 "'bounding_box' or omitted entirely, as it is the default "
                 f"value, but {query_type} was provided"
             )
 
-        if point and not bbox:
+        if point and len(bbox) == 0:
             assert query_type == "nearest", (
                 "When providing point, the query_type should be 'nearest' but "
                 f"{query_type} was provided."
