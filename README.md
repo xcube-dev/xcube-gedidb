@@ -43,5 +43,5 @@ With the existing environment activated, execute this command:
 mamba install --channel conda-forge xcube-gedi
 ```
 
-If xcube and any other necessary dependencies are not already instelled, they
+If xcube and any other necessary dependencies are not already installed, they
 will be installed automatically.

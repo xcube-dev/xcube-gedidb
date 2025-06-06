@@ -294,12 +294,11 @@ class GediDataStore(DataStore):
     @staticmethod
     def _get_gedi_metadata(concept_id: str) -> dict[str, tuple[Any]]:
         url = f"{NASA_CMR_URL}concept_id={concept_id}"
-        response = requests.get(url)
-
-        if response.status_code != 200:
-            raise RequestException(
-                f"Failed to retrieve metadata: HTTP" f" {response.status_code}"
-            )
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise RequestException(f"Failed to retrieve metadata: {e}")```
 
         data = response.json()
         entries = data.get("feed", {}).get("entry", [])
