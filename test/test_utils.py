@@ -19,6 +19,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import unittest
+
 import geopandas as gpd
 from shapely.geometry import Polygon
 from shapely.geometry import box
@@ -26,21 +28,21 @@ from shapely.geometry import box
 from xcube_gedi.utils import convert_bbox_to_geodf
 
 
-def test_convert_bbox_to_geodf_empty():
-    result = convert_bbox_to_geodf([])
-    assert result is None
+class GediDataStoreTest(unittest.TestCase):
+    def test_convert_bbox_to_geodf_empty(self):
+        result = convert_bbox_to_geodf([])
+        self.assertIsNone(result)
 
+    def test_convert_bbox_to_geodf_valid_bbox(self):
+        bbox = [-10, -5, 10, 5]
+        result = convert_bbox_to_geodf(bbox)
 
-def test_convert_bbox_to_geodf_valid_bbox():
-    bbox = [-10, -5, 10, 5]
-    result = convert_bbox_to_geodf(bbox)
+        self.assertIsInstance(result, gpd.GeoDataFrame)
+        self.assertIn("geometry", result.columns)
+        self.assertEqual(1, len(result))
 
-    assert isinstance(result, gpd.GeoDataFrame)
-    assert "geometry" in result.columns
-    assert len(result) == 1
+        expected_geom = box(*bbox)
+        actual_geom = result.iloc[0].geometry
 
-    expected_geom = box(*bbox)
-    actual_geom = result.iloc[0].geometry
-
-    assert isinstance(actual_geom, Polygon)
-    assert actual_geom.equals(expected_geom)
+        self.assertIsInstance(actual_geom, Polygon)
+        self.assertEqual(expected_geom, actual_geom)

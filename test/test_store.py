@@ -26,18 +26,18 @@ import pandas as pd
 import xarray as xr
 import pytest
 from requests import RequestException
-from xcube.core.store import DATASET_TYPE, DataDescriptor
+from xcube.core.store import DataDescriptor, new_data_store
 from xcube.util.jsonschema import JsonObjectSchema
 
-from xcube_gedi.store import GediDataStore, _GEDI_CONCEPT_IDS
+from xcube_gedi.store import _GEDI_CONCEPT_IDS
 
 
 class GediDataStoreTest(unittest.TestCase):
     def setUp(self):
-        self.store = GediDataStore()
+        self.store = new_data_store("gedi")
 
     def test_init(self):
-        self.assertEqual(len(self.store.data_ids), 5)
+        self.assertEqual(5, len(self.store.data_ids))
         self.assertIn("all", self.store.data_ids)
         self.assertIsInstance(self.store.provider, gedidb.GEDIProvider)
         self.assertIsInstance(self.store.all_supported_variables, pd.DataFrame)
@@ -46,42 +46,42 @@ class GediDataStoreTest(unittest.TestCase):
         schema = self.store.get_data_store_params_schema()
         self.assertIsInstance(schema, JsonObjectSchema)
         self.assertEqual(
-            schema.to_dict(),
             {"additionalProperties": False, "properties": {}, "type": "object"},
+            schema.to_dict(),
         )
 
     def test_get_data_types(self):
         types = self.store.get_data_types()
         self.assertIsInstance(types, tuple)
-        self.assertIn(DATASET_TYPE.alias, types)
+        self.assertEqual(("dataset",), types)
 
     def test_get_data_ids_without_attrs(self):
         data_ids = list(self.store.get_data_ids())
         expected_data_ids = ["L2A", "L2B", "L4A", "L4C", "all"]
-        self.assertEqual(sorted(data_ids), sorted(expected_data_ids))
+        self.assertEqual(sorted(expected_data_ids), sorted(data_ids))
 
     def test_get_data_ids_with_attrs(self):
         ids = list(self.store.get_data_ids(include_attrs=True))
         [
             self.assertIsInstance(item, tuple)
             and self.assertIsInstance(item[1], dict)
-            and self.assertEqual(item[1], {})
+            and self.assertEqual({}, item[1])
             for item in ids
         ]
 
     def test_has_data(self):
-        self.assertEqual(self.store.has_data("L2A"), True)
-        self.assertEqual(self.store.has_data("L4A"), True)
-        self.assertEqual(self.store.has_data("L4B"), False)
-        self.assertEqual(self.store.has_data("johndoe"), False)
+        self.assertTrue(self.store.has_data("L2A"))
+        self.assertTrue(self.store.has_data("L4A"))
+        self.assertFalse(self.store.has_data("L4B"))
+        self.assertFalse(self.store.has_data("johndoe"))
 
     def test_describe_data_valid(self):
         desc = self.store.describe_data("L4A")
         self.assertIsInstance(desc, DataDescriptor)
-        self.assertEqual(desc.data_id, "L4A")
-        self.assertEqual(desc.bbox, (-53.0, -180.0, 55.7983, 180.0))
+        self.assertEqual("L4A", desc.data_id)
+        self.assertEqual((-53.0, -180.0, 55.7983, 180.0), desc.bbox)
         self.assertEqual(
-            desc.time_range, ("2019-04-17T00:00:00.000Z", "2024-11-27T23:59:59.999Z")
+            ("2019-04-17T00:00:00.000Z", "2024-11-27T23:59:59.999Z"), desc.time_range
         )
 
     def test_describe_data_invalid(self):
@@ -102,8 +102,7 @@ class GediDataStoreTest(unittest.TestCase):
         self.assertIn("variables", schema_dict["properties"])
         self.assertIn("bbox", schema_dict["properties"])
         self.assertIn("query_type", schema_dict["properties"])
-        self.assertIn("start_time", schema_dict["properties"])
-        self.assertIn("end_time", schema_dict["properties"])
+        self.assertIn("time_range", schema_dict["properties"])
         self.assertIn("point", schema_dict["properties"])
         self.assertIn("num_shots", schema_dict["properties"])
         self.assertIn("radius", schema_dict["properties"])
@@ -114,15 +113,14 @@ class GediDataStoreTest(unittest.TestCase):
             data_id="L2A",
             variables=["rh"],
             bbox=(-112.30, 50.63, -112.0, 50.75),
-            start_time="2023-01-26",
-            end_time="2023-01-30",
+            time_range=("2023-01-26", "2023-01-30"),
         )
         self.assertIsInstance(ds, xr.Dataset)
-        dimensions = [d[0] for d in list(ds.dims.items())]
+        dimensions = list(ds.dims)
         self.assertIn("profile_points", dimensions)
         self.assertIn("shot_number", dimensions)
 
-        coords = [c[0] for c in list(ds.coords.items())]
+        coords = list(ds.coords)
         self.assertIn("profile_points", coords)
         self.assertIn("shot_number", coords)
         self.assertIn("latitude", coords)
@@ -149,21 +147,17 @@ class GediDataStoreTest(unittest.TestCase):
             data_id="all",
             variables=["rh", "cover"],
             bbox=(-112.30, 50.63, -112.0, 50.75),
-            start_time="2023-01-26",
-            end_time="2023-01-30",
+            time_range=("2023-01-26", "2023-01-30"),
         )
         self.assertIsInstance(ds, xr.Dataset)
 
     def test_open_data_invalid_variables(self):
-        with pytest.raises(
-            ValueError, match="The following variable\\(s\\) are invalid"
-        ):
+        with pytest.raises(ValueError, match="The following variable(s) are invalid"):
             self.store.open_data(
                 data_id="L2A",
                 variables=["invalid_var"],
                 bbox=(-112.30, 50.63, -112.0, 50.75),
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test_open_data_invalid_bbox_length(self):
@@ -174,8 +168,7 @@ class GediDataStoreTest(unittest.TestCase):
                 data_id="L2A",
                 variables=["rh"],
                 bbox=(-112.30, 50.63, -112.0),
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test_open_data_with_point_missing_radius(self):
@@ -187,8 +180,7 @@ class GediDataStoreTest(unittest.TestCase):
                 variables=["rh"],
                 point=[0, 0],
                 num_shots=10,
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test_open_data_with_bbox_wrong_query_type(self):
@@ -201,8 +193,7 @@ class GediDataStoreTest(unittest.TestCase):
                 variables=["rh"],
                 bbox=(-112.30, 50.63, -112.0, 50.75),
                 query_type="nearest",
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test_open_data_with_point_and_bbox_warning(self):
@@ -214,8 +205,7 @@ class GediDataStoreTest(unittest.TestCase):
                 bbox=(-112.30, 50.63, -112.0, 50.75),
                 num_shots=10,
                 radius=0.1,
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
         self.assertIn("Both bbox and point were provided", log.output[0])
         self.assertIsInstance(ds, xr.Dataset)
@@ -228,8 +218,7 @@ class GediDataStoreTest(unittest.TestCase):
             num_shots=5,
             radius=0.1,
             query_type="nearest",
-            start_time="2023-01-26",
-            end_time="2023-01-30",
+            time_range=("2023-01-26", "2023-01-30"),
         )
         self.assertIsInstance(ds, xr.Dataset)
 
@@ -239,18 +228,14 @@ class GediDataStoreTest(unittest.TestCase):
             variables=["rh"],
             bbox=(-112.30, 50.63, -112.0, 50.75),
             query_type="bounding_box",
-            start_time="2023-01-26",
-            end_time="2023-01-30",
+            time_range=("2023-01-26", "2023-01-30"),
         )
         self.assertIsInstance(ds, xr.Dataset)
 
     def test_open_data_without_bbox(self):
         with pytest.raises(ValueError):
             ds = self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                data_id="L2A", variables=["rh"], time_range=("2023-01-26", "2023-01-30")
             )
 
         with pytest.raises(ValueError):
@@ -258,8 +243,7 @@ class GediDataStoreTest(unittest.TestCase):
                 data_id="L2A",
                 variables=["rh"],
                 bbox=[],
-                start_time="2023-01-26",
-                end_time="2023-01-30",
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test_open_data_invalid_data_id(self):
@@ -279,10 +263,10 @@ class GediDataStoreTest(unittest.TestCase):
     def test__get_gedi_metadata_success(self):
         metadata = self.store._get_gedi_metadata(_GEDI_CONCEPT_IDS.get("L4A"))
         self.assertIsInstance(metadata, dict)
-        self.assertEqual(metadata.get("bbox"), (-53.0, -180.0, 55.7983, 180.0))
+        self.assertEqual((-53.0, -180.0, 55.7983, 180.0), metadata.get("bbox"))
         self.assertEqual(
-            metadata.get("time_range"),
             ("2019-04-17T00:00:00.000Z", "2024-11-27T23:59:59.999Z"),
+            metadata.get("time_range"),
         )
 
     def test__get_gedi_metadata_exception(self):

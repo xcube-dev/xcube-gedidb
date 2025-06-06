@@ -14,9 +14,9 @@ an [xcube plugin](https://xcube.readthedocs.io/en/latest/plugins.html).
 It uses the [gedidb](https://gedidb.readthedocs.io/en/latest/)
 package under the hood.
 
-## Setup <a name="setup"></a>
+## Setup
 
-### Installing the xcube-gedi plugin from the repository <a name="install_source"></a>
+### Installing the xcube-gedi plugin from the repository
 
 To install xcube-gedi directly from the git repository, clone the repository,
 `cd` into `xcube-gedi`, and follow the steps below:

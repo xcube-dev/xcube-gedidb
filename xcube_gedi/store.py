@@ -31,14 +31,13 @@ from requests import RequestException
 from xcube.core.store import DataDescriptor, DataStore, DataTypeLike, DATASET_TYPE
 from xcube.util.jsonschema import (
     JsonObjectSchema,
-    JsonComplexSchema,
     JsonStringSchema,
     JsonArraySchema,
     JsonIntegerSchema,
     JsonNumberSchema,
 )
-from xcube_gedi.constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG, NASA_CMR_URL
-from xcube_gedi.utils import convert_bbox_to_geodf, assert_valid_data_type
+from .constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG, NASA_CMR_URL
+from .utils import convert_bbox_to_geodf, assert_valid_data_type
 
 _GEDI_DATA_RETURN_TYPE = "xarray"
 
@@ -95,7 +94,7 @@ class GediDataStore(DataStore):
         self,
         data_type: DataTypeLike = None,
         include_attrs: Container[str] | bool = False,
-    ) -> Union[Iterator[str], Iterator[tuple[str, dict[str, Any]]]]:
+    ) -> Iterator[str | tuple[str, dict[str, Any]]]:
         assert_valid_data_type(data_type)
         if include_attrs:
             LOG.warning("There are no attributes for data_ids in this data store")
@@ -141,7 +140,9 @@ class GediDataStore(DataStore):
         self, data_id: str = None, opener_id: str = None
     ) -> JsonObjectSchema:
         if opener_id:
-            LOG.warning("opener_id will be ignored")
+            LOG.warning(
+                "`opener_id` is ignored since only one way to open the data exists."
+            )
         if data_id:
             possible_variables = self._get_available_variables(data_id)
         else:
@@ -150,50 +151,37 @@ class GediDataStore(DataStore):
         return JsonObjectSchema(
             properties=dict(
                 variables=JsonArraySchema(
-                    enum=list(
-                        possible_variables.index + ": " + possible_variables.description
-                    ),
-                    description="List of variables to retrieve from the database.",
+                    items=list(possible_variables.index),
+                    description="(Optional) List of variables to retrieve from "
+                    "the database.",
                 ),
                 bbox=JsonArraySchema(
                     min_items=4,
                     max_items=4,
-                    description="(Optional) A bounding box as an array "
-                    "of [xmin, ymin, xmax, ymax]",
+                    description="(Optional) A bounding box as an array. "
+                    "(format: Tuple[xmin, ymin, xmax, ymax]).",
                 ),
-                query_type=JsonStringSchema(
-                    description="(Optional) Type of query to execute, either "
-                    "'nearest' or 'bounding_box', in case of nearest, a point "
-                    "has to be provided as well",
-                    default="bounding_box",
-                ),
-                start_time=JsonStringSchema(
-                    description="(Optional) Start date for temporal filtering "
-                    "(format: 'YYYY-MM-DD')."
-                ),
-                end_time=JsonStringSchema(
-                    description="(Optional) End date for temporal filtering "
-                    "(format: 'YYYY-MM-DD')."
+                time_range=JsonStringSchema(
+                    description="(Optional) Start and end date for temporal "
+                    "filtering (format: Tuple('YYYY-MM-DD', 'YYYY-MM-DD'))."
                 ),
                 point=JsonArraySchema(
                     min_items=2,
                     max_items=2,
                     description="(Optional) Reference point for nearest "
-                    "query, required if query_type is 'nearest' (format: "
-                    "Tuple[longitude, latitude]).",
+                    "query. (format: Tuple[longitude, latitude]).",
                 ),
                 num_shots=JsonIntegerSchema(
                     default=10,
-                    description="(Optional) Number of shots to retrieve if the "
-                    "query_type is 'nearest'",
+                    description="(Optional) Number of shots to retrieve if "
+                    "point is provided.",
                 ),
                 radius=JsonNumberSchema(
                     default=0.1,
                     description="(Optional) Radius in degrees around the point "
-                    "if the query_type is 'nearest'",
+                    "if point is provided.",
                 ),
             ),
-            required=["variables"],
         )
 
     def open_data(
@@ -202,64 +190,34 @@ class GediDataStore(DataStore):
         opener_id: str = None,
         **open_params,
     ) -> xr.Dataset:
-        assert data_id in self.data_ids
+        schema = self.get_open_data_params_schema()
+        schema.validate_instance(open_params)
 
-        assert open_params.get("variables", None) is not None, "Variables are missing."
+        if not self.has_data(data_id):
+            raise ValueError(f"data_id {data_id} is invalid.")
 
-        vars_selected = open_params.get("variables")
-        if data_id == "all":
-            possible_variables = list(self.all_supported_variables.index)
-        else:
-            possible_variables = list(self._get_available_variables(data_id).index)
-        invalid_vars = [
-            elem for elem in vars_selected if elem not in possible_variables
-        ]
-
-        if len(invalid_vars) > 0:
-            raise ValueError(
-                f"The following variable(s) are invalid: {invalid_vars} for "
-                f"data_id: {data_id}"
-            )
+        vars_selected = open_params.get("variables", None)
+        if vars_selected is None:
+            vars_selected = list(self._get_available_variables(data_id).index)
 
         bbox = open_params.get("bbox", [])
-        if len(bbox) != 0:
-            assert len(bbox) == 4, (
-                "Please provide a bbox as the following list ["
-                f"xmin, ymin, xmax, ymax], but got {bbox} "
-                "instead"
-            )
-        query_type = open_params.get("query_type", "")
-        start_time = open_params.get("start_time", None)
-        end_time = open_params.get("end_time", None)
+
+        start_time, end_time = open_params.get("time_range", (None, None))
 
         point = open_params.get("point", None)
         num_shots = open_params.get("num_shots", None)
         radius = open_params.get("radius", None)
-        if point is not None:
-            assert (
-                num_shots is not None
-            ), "num_shots should be provided when using point"
-            assert radius is not None, "radius should be provided when using point"
-        if point is not None and len(bbox) != 0:
-            LOG.warning(
-                "Both bbox and point were provided, by default bbox will be used."
-            )
+
+        if len(bbox) != 0:
+            if point is not None:
+                LOG.warning(
+                    "Both bbox and point were provided, by default bbox will be used."
+                )
             query_type = "bounding_box"
+        else:
+            query_type = "nearest"
 
-        if len(bbox) > 0:
-            assert query_type == "" or query_type == "bounding_box", (
-                " When providing a bbox, the query_type should either be "
-                "'bounding_box' or omitted entirely, as it is the default "
-                f"value, but {query_type} was provided"
-            )
-
-        if point and len(bbox) == 0:
-            assert query_type == "nearest", (
-                "When providing point, the query_type should be 'nearest' but "
-                f"{query_type} was provided."
-            )
-
-        if query_type == "" or query_type != "nearest":
+        if query_type == "bounding_box":
             region_of_interest = convert_bbox_to_geodf(bbox)
             return self.provider.get_data(
                 variables=vars_selected,
@@ -281,6 +239,7 @@ class GediDataStore(DataStore):
                 return_type=_GEDI_DATA_RETURN_TYPE,
             )
 
+    @classmethod
     def get_search_params_schema(
         cls, data_type: DataTypeLike = None
     ) -> JsonObjectSchema:
@@ -298,7 +257,7 @@ class GediDataStore(DataStore):
             response = requests.get(url)
             response.raise_for_status()
         except requests.RequestException as e:
-            raise RequestException(f"Failed to retrieve metadata: {e}")```
+            raise RequestException(f"Failed to retrieve metadata: {e}")
 
         data = response.json()
         entries = data.get("feed", {}).get("entry", [])
@@ -325,6 +284,8 @@ class GediDataStore(DataStore):
         self,
         product_level: str,
     ) -> pd.DataFrame:
+        if product_level == "all":
+            return self.all_supported_variables
         return self.all_supported_variables[
             self.all_supported_variables["product_level"] == product_level
         ]
