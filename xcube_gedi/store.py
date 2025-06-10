@@ -174,8 +174,8 @@ class GediDataStore(DataStore):
                         JsonNumberSchema(minimum=-180, maximum=180),
                         JsonNumberSchema(minimum=-90, maximum=90),
                     ),
-                    description="(Optional) A bounding box as an array. "
-                    "(format: Tuple[xmin, ymin, xmax, ymax]).",
+                    description="A bounding box in the form of "
+                    "(xmin, ymin, xmax, ymax).",
                 ),
                 **common_schema,
             ),
