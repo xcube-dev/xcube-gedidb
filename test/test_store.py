@@ -25,6 +25,7 @@ import gedidb
 import pandas as pd
 import xarray as xr
 import pytest
+from jsonschema.exceptions import ValidationError
 from requests import RequestException
 from xcube.core.store import DataDescriptor, new_data_store
 from xcube.util.jsonschema import JsonObjectSchema
@@ -99,14 +100,14 @@ class GediDataStoreTest(unittest.TestCase):
     def test_get_open_data_params_schema(self):
         schema = self.store.get_open_data_params_schema()
         schema_dict = schema.to_dict()
-        self.assertIn("variables", schema_dict["properties"])
-        self.assertIn("bbox", schema_dict["properties"])
-        self.assertIn("query_type", schema_dict["properties"])
-        self.assertIn("time_range", schema_dict["properties"])
-        self.assertIn("point", schema_dict["properties"])
-        self.assertIn("num_shots", schema_dict["properties"])
-        self.assertIn("radius", schema_dict["properties"])
-        self.assertIn("variables", schema_dict["required"])
+        self.assertIn("variables", schema_dict["oneOf"][0]["properties"])
+        self.assertIn("variables", schema_dict["oneOf"][1]["properties"])
+        self.assertIn("time_range", schema_dict["oneOf"][0]["properties"])
+        self.assertIn("time_range", schema_dict["oneOf"][1]["properties"])
+        self.assertIn("bbox", schema_dict["oneOf"][0]["properties"])
+        self.assertIn("point", schema_dict["oneOf"][1]["properties"])
+        self.assertIn("num_shots", schema_dict["oneOf"][1]["properties"])
+        self.assertIn("radius", schema_dict["oneOf"][1]["properties"])
 
     def test_open_data_with_bbox(self):
         ds = self.store.open_data(
@@ -127,21 +128,6 @@ class GediDataStoreTest(unittest.TestCase):
         self.assertIn("longitude", coords)
         self.assertIn("time", coords)
 
-    def test_open_data_with_point_missing_numshots(self):
-        with pytest.raises(AssertionError, match="num_shots should be provided"):
-            self.store.open_data(data_id="L2A", variables=["rh"], point=[0, 0])
-
-    def test_open_data_with_point_wrong_query_type(self):
-        with pytest.raises(AssertionError, match="should be 'nearest'"):
-            self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                point=[0, 0],
-                num_shots=10,
-                radius=0.1,
-                query_type="bounding_box",
-            )
-
     def test_open_data_with_all_data_id(self):
         ds = self.store.open_data(
             data_id="all",
@@ -151,113 +137,37 @@ class GediDataStoreTest(unittest.TestCase):
         )
         self.assertIsInstance(ds, xr.Dataset)
 
-    def test_open_data_invalid_variables(self):
-        with pytest.raises(ValueError, match="The following variable(s) are invalid"):
-            self.store.open_data(
-                data_id="L2A",
-                variables=["invalid_var"],
-                bbox=(-112.30, 50.63, -112.0, 50.75),
-                time_range=("2023-01-26", "2023-01-30"),
-            )
-
-    def test_open_data_invalid_bbox_length(self):
-        with pytest.raises(
-            AssertionError, match="Please provide a bbox as the following list"
-        ):
-            self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                bbox=(-112.30, 50.63, -112.0),
-                time_range=("2023-01-26", "2023-01-30"),
-            )
-
-    def test_open_data_with_point_missing_radius(self):
-        with pytest.raises(
-            AssertionError, match="radius should be provided when using point"
-        ):
-            self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                point=[0, 0],
-                num_shots=10,
-                time_range=("2023-01-26", "2023-01-30"),
-            )
-
-    def test_open_data_with_bbox_wrong_query_type(self):
-        with pytest.raises(
-            AssertionError,
-            match="When providing a bbox, the query_type should either be",
-        ):
-            self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                bbox=(-112.30, 50.63, -112.0, 50.75),
-                query_type="nearest",
-                time_range=("2023-01-26", "2023-01-30"),
-            )
-
-    def test_open_data_with_point_and_bbox_warning(self):
-        with self.assertLogs(level="WARNING") as log:
+    def test_open_data_with_point_and_bbox_validation_error(self):
+        with pytest.raises(ValidationError):
             ds = self.store.open_data(
                 data_id="L2A",
                 variables=["rh"],
-                point=[0, 0],
+                point=(0, 0),
                 bbox=(-112.30, 50.63, -112.0, 50.75),
                 num_shots=10,
                 radius=0.1,
                 time_range=("2023-01-26", "2023-01-30"),
             )
-        self.assertIn("Both bbox and point were provided", log.output[0])
-        self.assertIsInstance(ds, xr.Dataset)
 
-    def test_open_data_with_point_nearest_query(self):
+    def test_open_data_with_point(self):
         ds = self.store.open_data(
             data_id="L2A",
             variables=["rh"],
             point=(-112.15, 50.69),
             num_shots=5,
             radius=0.1,
-            query_type="nearest",
             time_range=("2023-01-26", "2023-01-30"),
         )
         self.assertIsInstance(ds, xr.Dataset)
-
-    def test_open_data_with_bounding_box_query_type_explicit(self):
-        ds = self.store.open_data(
-            data_id="L2A",
-            variables=["rh"],
-            bbox=(-112.30, 50.63, -112.0, 50.75),
-            query_type="bounding_box",
-            time_range=("2023-01-26", "2023-01-30"),
-        )
-        self.assertIsInstance(ds, xr.Dataset)
-
-    def test_open_data_without_bbox(self):
-        with pytest.raises(ValueError):
-            ds = self.store.open_data(
-                data_id="L2A", variables=["rh"], time_range=("2023-01-26", "2023-01-30")
-            )
-
-        with pytest.raises(ValueError):
-            ds = self.store.open_data(
-                data_id="L2A",
-                variables=["rh"],
-                bbox=[],
-                time_range=("2023-01-26", "2023-01-30"),
-            )
 
     def test_open_data_invalid_data_id(self):
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             self.store.open_data(
                 data_id="invalid_id",
                 variables=["rh"],
-            )
-
-    def test_open_data_missing_variables(self):
-        with pytest.raises(AssertionError):
-            self.store.open_data(
-                data_id="L2A",
-                variables=None,
+                point=(-112.15, 50.69),
+                num_shots=5,
+                radius=0.1,
             )
 
     def test__get_gedi_metadata_success(self):

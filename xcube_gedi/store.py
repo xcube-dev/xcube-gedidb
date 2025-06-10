@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Tuple, Iterator, Container, Union, Any
+from typing import Tuple, Iterator, Container, Any
 
 import requests
 import xarray as xr
@@ -35,6 +35,8 @@ from xcube.util.jsonschema import (
     JsonArraySchema,
     JsonIntegerSchema,
     JsonNumberSchema,
+    JsonDateSchema,
+    JsonComplexSchema,
 )
 from .constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG, NASA_CMR_URL
 from .utils import convert_bbox_to_geodf, assert_valid_data_type
@@ -138,7 +140,7 @@ class GediDataStore(DataStore):
 
     def get_open_data_params_schema(
         self, data_id: str = None, opener_id: str = None
-    ) -> JsonObjectSchema:
+    ) -> JsonComplexSchema:
         if opener_id:
             LOG.warning(
                 "`opener_id` is ignored since only one way to open the data exists."
@@ -148,41 +150,57 @@ class GediDataStore(DataStore):
         else:
             possible_variables = self.all_supported_variables
 
-        return JsonObjectSchema(
-            properties=dict(
-                variables=JsonArraySchema(
-                    items=list(possible_variables.index),
-                    description="(Optional) List of variables to retrieve from "
-                    "the database.",
+        common_schema = dict(
+            variables=JsonArraySchema(
+                items=(
+                    JsonStringSchema(
+                        min_length=0,
+                        enum=list(possible_variables.index),
+                    )
                 ),
+                unique_items=True,
+                description="(Optional) List of variables to retrieve from "
+                "the database.",
+            ),
+            time_range=JsonDateSchema.new_range(),
+        )
+
+        bbox_schema = JsonObjectSchema(
+            properties=dict(
                 bbox=JsonArraySchema(
-                    min_items=4,
-                    max_items=4,
+                    items=(
+                        JsonNumberSchema(minimum=-180, maximum=180),
+                        JsonNumberSchema(minimum=-90, maximum=90),
+                        JsonNumberSchema(minimum=-180, maximum=180),
+                        JsonNumberSchema(minimum=-90, maximum=90),
+                    ),
                     description="(Optional) A bounding box as an array. "
                     "(format: Tuple[xmin, ymin, xmax, ymax]).",
                 ),
-                time_range=JsonStringSchema(
-                    description="(Optional) Start and end date for temporal "
-                    "filtering (format: Tuple('YYYY-MM-DD', 'YYYY-MM-DD'))."
-                ),
+                **common_schema,
+            ),
+            required=["bbox", "time_range"],
+        )
+
+        point_schema = JsonObjectSchema(
+            properties=dict(
                 point=JsonArraySchema(
-                    min_items=2,
-                    max_items=2,
-                    description="(Optional) Reference point for nearest "
+                    items=(JsonNumberSchema(), JsonNumberSchema()),
+                    description="Reference point for nearest "
                     "query. (format: Tuple[longitude, latitude]).",
                 ),
                 num_shots=JsonIntegerSchema(
-                    default=10,
-                    description="(Optional) Number of shots to retrieve if "
-                    "point is provided.",
+                    default=10, description="Number of shots to retrieve. "
                 ),
                 radius=JsonNumberSchema(
-                    default=0.1,
-                    description="(Optional) Radius in degrees around the point "
-                    "if point is provided.",
+                    default=0.1, description="Radius in degrees around the point."
                 ),
+                **common_schema,
             ),
+            required=["point", "num_shots", "radius", "time_range"],
         )
+
+        return JsonComplexSchema(one_of=[bbox_schema, point_schema])
 
     def open_data(
         self,
@@ -208,16 +226,7 @@ class GediDataStore(DataStore):
         num_shots = open_params.get("num_shots", None)
         radius = open_params.get("radius", None)
 
-        if len(bbox) != 0:
-            if point is not None:
-                LOG.warning(
-                    "Both bbox and point were provided, by default bbox will be used."
-                )
-            query_type = "bounding_box"
-        else:
-            query_type = "nearest"
-
-        if query_type == "bounding_box":
+        if bbox:
             region_of_interest = convert_bbox_to_geodf(bbox)
             return self.provider.get_data(
                 variables=vars_selected,
@@ -248,7 +257,7 @@ class GediDataStore(DataStore):
     def search_data(
         self, data_type: DataTypeLike = None, **search_params
     ) -> Iterator[DataDescriptor]:
-        raise NotImplementedError("search_data() operation is not supported yet")
+        raise NotImplementedError("search_data() operation is not supported.")
 
     @staticmethod
     def _get_gedi_metadata(concept_id: str) -> dict[str, tuple[Any]]:
@@ -278,7 +287,9 @@ class GediDataStore(DataStore):
         time_end = entry.get("time_end")
         time_range = (time_start, time_end)
 
-        return {"bbox": tuple(bbox), "time_range": tuple(time_range)}
+        crs = "EPSG:4326"
+
+        return {"bbox": tuple(bbox), "time_range": tuple(time_range), "crs": crs}
 
     def _get_available_variables(
         self,
