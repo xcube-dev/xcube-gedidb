@@ -187,7 +187,7 @@ class GediDataStore(DataStore):
                 point=JsonArraySchema(
                     items=(JsonNumberSchema(), JsonNumberSchema()),
                     description="Reference point for nearest "
-                    "query. (format: Tuple[longitude, latitude]).",
+                    "query as (longitude, latitude).",
                 ),
                 num_shots=JsonIntegerSchema(
                     default=10, description="Number of shots to retrieve. "
