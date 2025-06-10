@@ -19,6 +19,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from .version import version as __version__
+import unittest
 
-__all__ = ["__version__"]
+import geopandas as gpd
+import pytest
+from shapely.geometry import Polygon
+from shapely.geometry import box
+
+from xcube_gedi.utils import convert_bbox_to_geodf
+
+
+class GediDataStoreTest(unittest.TestCase):
+    def test_convert_bbox_to_geodf_valid_bbox(self):
+        bbox = [-10, -5, 10, 5]
+        result = convert_bbox_to_geodf(bbox)
+
+        self.assertIsInstance(result, gpd.GeoDataFrame)
+        self.assertIn("geometry", result.columns)
+        self.assertEqual(1, len(result))
+
+        expected_geom = box(*bbox)
+        actual_geom = result.iloc[0].geometry
+
+        self.assertIsInstance(actual_geom, Polygon)
+        self.assertEqual(expected_geom, actual_geom)

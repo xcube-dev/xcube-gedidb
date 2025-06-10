@@ -6,8 +6,12 @@ dependencies:
   # Required
   - python>=3.10
   - xarray
-  - xcube >= 1.9.0
+  - xcube
+  - pip
+  - pip:
+      - gedidb
   # for testing
   - black
   - flake8
   - pytest
+  - pytest-cov

@@ -19,16 +19,42 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from xcube.constants import EXTENSION_POINT_DATA_STORES
-from xcube.util import extension
+from typing import Sequence
 
-from .constant import DATA_STORE_ID
+import geopandas as gpd
+from shapely.geometry import box
+from xcube.core.store import DataStoreError, DATASET_TYPE, DataTypeLike
 
 
-def init_plugin(ext_registry: extension.ExtensionRegistry):
-    ext_registry.add_extension(
-        loader=extension.import_component("xcube_gedi.store:GediDataStore"),
-        point=EXTENSION_POINT_DATA_STORES,
-        name=DATA_STORE_ID,
-        description="Gedi DataStore",
-    )
+def convert_bbox_to_geodf(bbox: Sequence[float]) -> gpd.GeoDataFrame:
+    return gpd.GeoDataFrame({"geometry": [box(*bbox)]})
+
+
+def assert_valid_data_type(data_type: DataTypeLike):
+    """Auxiliary function to assert if data type is supported
+    by the store.
+
+    Args:
+        data_type: Data type that is to be checked.
+
+    Raises:
+        DataStoreError: Error, if *data_type* is not
+            supported by the store.
+    """
+    if not is_valid_data_type(data_type):
+        raise DataStoreError(
+            f"Data type must be {DATASET_TYPE.alias!r} or but got {data_type!r}."
+        )
+
+
+def is_valid_data_type(data_type: DataTypeLike) -> bool:
+    """Auxiliary function to check if data type is supported
+    by the store.
+
+    Args:
+        data_type: Data type that is to be checked.
+
+    Returns:
+        True if *data_type* is supported by the store, otherwise False
+    """
+    return data_type is None or DATASET_TYPE.is_super_type_of(data_type)
