@@ -168,6 +168,7 @@ class GediDataStoreTest(unittest.TestCase):
                 point=(-112.15, 50.69),
                 num_shots=5,
                 radius=0.1,
+                time_range=("2023-01-26", "2023-01-30"),
             )
 
     def test__get_gedi_metadata_success(self):
