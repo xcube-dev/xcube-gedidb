@@ -287,9 +287,7 @@ class GediDataStore(DataStore):
         time_end = entry.get("time_end")
         time_range = (time_start, time_end)
 
-        crs = "EPSG:4326"
-
-        return {"bbox": tuple(bbox), "time_range": tuple(time_range), "crs": crs}
+        return {"bbox": tuple(bbox), "time_range": tuple(time_range)}
 
     def _get_available_variables(
         self,
