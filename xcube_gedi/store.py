@@ -159,7 +159,7 @@ class GediDataStore(DataStore):
                     )
                 ),
                 unique_items=True,
-                description="(Optional) List of variables to retrieve from "
+                description="List of variables to retrieve from "
                 "the database.",
             ),
             time_range=JsonDateSchema.new_range(),
