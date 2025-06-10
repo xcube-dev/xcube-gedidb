@@ -197,7 +197,7 @@ class GediDataStore(DataStore):
                 ),
                 **common_schema,
             ),
-            required=["point", "num_shots", "radius", "time_range"],
+            required=["point", "time_range"],
         )
 
         return JsonComplexSchema(one_of=[bbox_schema, point_schema])
@@ -214,17 +214,17 @@ class GediDataStore(DataStore):
         if not self.has_data(data_id):
             raise ValueError(f"data_id {data_id} is invalid.")
 
-        vars_selected = open_params.get("variables", None)
+        vars_selected = open_params.get("variables")
         if vars_selected is None:
             vars_selected = list(self._get_available_variables(data_id).index)
 
         bbox = open_params.get("bbox", [])
 
-        start_time, end_time = open_params.get("time_range", (None, None))
+        start_time, end_time = open_params.get("time_range")
 
-        point = open_params.get("point", None)
-        num_shots = open_params.get("num_shots", None)
-        radius = open_params.get("radius", None)
+        point = open_params.get("point")
+        num_shots = open_params.get("num_shots", 10)
+        radius = open_params.get("radius", 0.1)
 
         if bbox:
             region_of_interest = convert_bbox_to_geodf(bbox)
