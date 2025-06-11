@@ -1,4 +1,4 @@
-name: xcube-gedi
+name: xcube-gedidb
 channels:
   - conda-forge
   - defaults

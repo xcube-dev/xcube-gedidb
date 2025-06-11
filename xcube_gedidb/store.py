@@ -38,12 +38,12 @@ from xcube.util.jsonschema import (
     JsonDateSchema,
     JsonComplexSchema,
 )
-from .constant import GEDI_S3_BUCKET_NAME, GEDI_URL, LOG, NASA_CMR_URL
+from .constant import GEDIDB_S3_BUCKET_NAME, GEDIDB_URL, LOG, NASA_CMR_URL
 from .utils import convert_bbox_to_geodf, assert_valid_data_type
 
-_GEDI_DATA_RETURN_TYPE = "xarray"
+_GEDIDB_DATA_RETURN_TYPE = "xarray"
 
-_GEDI_LEVELS_DESCRIPTION = {
+_GEDI_PRODUCT_LEVELS_DESCRIPTION = {
     "L2A": "Geolocated waveform data and relative height metrics.",
     "L2B": "Vegetation canopy cover and vertical profile metrics.",
     "L4A": "Aboveground biomass density estimates.",
@@ -53,7 +53,7 @@ _GEDI_LEVELS_DESCRIPTION = {
 
 # These concept IDs are required by the NASA CMR API to return the metadata
 # for the requested processed level GEDI data
-_GEDI_CONCEPT_IDS = {
+_GEDI_PRODUCT_CONCEPT_IDS = {
     "L2A": "C2142771958-LPCLOUD",
     "L2B": "C2142776747-LPCLOUD",
     "L4A": "C2237824918-ORNL_CLOUD",
@@ -61,12 +61,12 @@ _GEDI_CONCEPT_IDS = {
 }
 
 
-class GediDataStore(DataStore):
-    """Implementation of Gedi data store ."""
+class GediDbDataStore(DataStore):
+    """Implementation of GediDB data store ."""
 
     def __init__(self):
         self.provider = gdb.GEDIProvider(
-            storage_type="s3", s3_bucket=GEDI_S3_BUCKET_NAME, url=GEDI_URL
+            storage_type="s3", s3_bucket=GEDIDB_S3_BUCKET_NAME, url=GEDIDB_URL
         )
         self.all_supported_variables: pd.DataFrame = (
             self.provider.get_available_variables()
@@ -126,7 +126,9 @@ class GediDataStore(DataStore):
                 "instead"
             )
 
-        metadata = dict(**self._get_gedi_metadata(_GEDI_CONCEPT_IDS.get(data_id)))
+        metadata = dict(
+            **self._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get(data_id))
+        )
         return DataDescriptor(data_id, data_type, **metadata)
 
     def get_data_opener_ids(
@@ -159,8 +161,7 @@ class GediDataStore(DataStore):
                     )
                 ),
                 unique_items=True,
-                description="List of variables to retrieve from "
-                "the database.",
+                description="List of variables to retrieve from the database.",
             ),
             time_range=JsonDateSchema.new_range(),
         )
@@ -234,7 +235,7 @@ class GediDataStore(DataStore):
                 geometry=region_of_interest,
                 start_time=start_time,
                 end_time=end_time,
-                return_type=_GEDI_DATA_RETURN_TYPE,
+                return_type=_GEDIDB_DATA_RETURN_TYPE,
             )
         else:
             return self.provider.get_data(
@@ -245,7 +246,7 @@ class GediDataStore(DataStore):
                 radius=radius,
                 start_time=start_time,
                 end_time=end_time,
-                return_type=_GEDI_DATA_RETURN_TYPE,
+                return_type=_GEDIDB_DATA_RETURN_TYPE,
             )
 
     @classmethod

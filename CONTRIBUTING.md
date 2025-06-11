@@ -1,16 +1,16 @@
 # How to contribute
 
-The `xcube-gedi` project welcomes contributions of any form
+The `xcube-gedidb` project welcomes contributions of any form
 as long as you respect our [code of conduct](CODE_OF_CONDUCT.md) and stay
 in line with the following instructions and guidelines.
 
 If you have suggestions, ideas, feature requests, or if you have identified
 a malfunction or error, then please
-[post an issue](https://github.com/xcube-dev/xcube-gedi/issues).
+[post an issue](https://github.com/xcube-dev/xcube-gedidb/issues).
 
 If you'd like to submit code or documentation changes, we ask you to provide a
 pull request (PR)
-[here](https://github.com/xcube-dev/xcube-gedi/pulls).
+[here](https://github.com/xcube-dev/xcube-gedidb/pulls).
 For code and configuration changes, your PR must be linked to a
 corresponding issue.
 
@@ -27,11 +27,11 @@ checklist are addressed in your PR.
   `pytest` must run without errors.
 * Add unit tests for any new code not yet covered by tests.
 * Make sure test coverage is close to 100% for any change.
-  Use `pytest --cov=xcube_gedi --cov-report=html` to verify.
+  Use `pytest --cov=xcube_gedidb --cov-report=html` to verify.
 
 ## Code style <a name="code-style"></a>
 
-The `xcube-gedi` code compliant to [PEP-8](https://pep8.org/) except for a line
+The `xcube-gedidb` code compliant to [PEP-8](https://pep8.org/) except for a line
 length of 88 characters as recommended
 by [black](https://black.readthedocs.io/).
 Since black is un-opinionated regarding the order of imports,
@@ -40,4 +40,4 @@ line:
 
 1. Python standard library imports, e.g., `os`, `typing`, etc
 2. 3rd-party imports, e.g., `xarray`, `zarr`, etc
-3. Relative `xcube_gedi` module imports using `.` prefix.
+3. Relative `xcube_gedidb` module imports using `.` prefix.

@@ -3,16 +3,16 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "xcube_gedi"
+name = "xcube_gedidb"
 dynamic = ["version"]
 authors = [
     {name = "Yogesh Kumar Baljeet Singh", email = "yogesh.baljeetsingh@brockmann-consult.de"}
 ]
 description = """\
-  xcube datastore for accessing Gedi datastore\
+  xcube datastore for accessing GediDB datastore\
   """
 keywords = [
-    "analysis ready data", "data science", "datacube", "xarray", "zarr", "xcube", "gedi"
+    "analysis ready data", "data science", "datacube", "xarray", "zarr", "xcube", "gedi", "gedidb"
 ]
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "MIT"}
@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "xcube_gedi.__version__"}
+version = {attr = "xcube_gedidb.__version__"}
 
 [project.optional-dependencies]
 dev = [
@@ -34,6 +34,6 @@ dev = [
 ]
 
 [project.urls]
-Repository = 'https://github.com/xcube-dev/xcube-gedi'
-Issues = 'https://github.com/xcube-dev/xcube-gedi/issues'
-Changelog = 'https://github.com/xcube-dev/xcube-gedi/blob/main/CHANGES.md'
+Repository = 'https://github.com/xcube-dev/xcube-gedidb'
+Issues = 'https://github.com/xcube-dev/xcube-gedidb/issues'
+Changelog = 'https://github.com/xcube-dev/xcube-gedidb/blob/main/CHANGES.md'

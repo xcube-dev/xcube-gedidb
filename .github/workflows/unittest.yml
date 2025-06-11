@@ -1,4 +1,4 @@
-name: Unittest xcube-gedi
+name: Unittest xcube-gedidb
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   unittest:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout xcube-gedi
+      - name: checkout xcube-gedidb
         uses: actions/checkout@v4
 
       - name: Set up MicroMamba
@@ -20,7 +20,7 @@ jobs:
       - name: Install and Test
         shell: bash -l {0}
         run:
-          pytest test/ --cov=xcube_gedi --cov-report=xml
+          pytest test/ --cov=xcube_gedidb --cov-report=xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

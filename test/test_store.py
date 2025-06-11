@@ -30,12 +30,12 @@ from requests import RequestException
 from xcube.core.store import DataDescriptor, new_data_store
 from xcube.util.jsonschema import JsonObjectSchema
 
-from xcube_gedi.store import _GEDI_CONCEPT_IDS
+from xcube_gedidb.store import _GEDI_PRODUCT_CONCEPT_IDS
 
 
-class GediDataStoreTest(unittest.TestCase):
+class GediDbDataStoreTest(unittest.TestCase):
     def setUp(self):
-        self.store = new_data_store("gedi")
+        self.store = new_data_store("gedidb")
 
     def test_init(self):
         self.assertEqual(5, len(self.store.data_ids))
@@ -172,7 +172,7 @@ class GediDataStoreTest(unittest.TestCase):
             )
 
     def test__get_gedi_metadata_success(self):
-        metadata = self.store._get_gedi_metadata(_GEDI_CONCEPT_IDS.get("L4A"))
+        metadata = self.store._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get("L4A"))
         self.assertIsInstance(metadata, dict)
         self.assertEqual((-53.0, -180.0, 55.7983, 180.0), metadata.get("bbox"))
         self.assertEqual(
