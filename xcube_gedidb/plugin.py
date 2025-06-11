@@ -27,8 +27,8 @@ from .constant import DATA_STORE_ID
 
 def init_plugin(ext_registry: extension.ExtensionRegistry):
     ext_registry.add_extension(
-        loader=extension.import_component("xcube_gedi.store:GediDataStore"),
+        loader=extension.import_component("xcube_gedidb.store:GediDbDataStore"),
         point=EXTENSION_POINT_DATA_STORES,
         name=DATA_STORE_ID,
-        description="Gedi DataStore",
+        description="GediDB DataStore",
     )

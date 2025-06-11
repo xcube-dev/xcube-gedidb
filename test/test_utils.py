@@ -22,14 +22,13 @@
 import unittest
 
 import geopandas as gpd
-import pytest
 from shapely.geometry import Polygon
 from shapely.geometry import box
 
-from xcube_gedi.utils import convert_bbox_to_geodf
+from xcube_gedidb.utils import convert_bbox_to_geodf
 
 
-class GediDataStoreTest(unittest.TestCase):
+class UtilsTest(unittest.TestCase):
     def test_convert_bbox_to_geodf_valid_bbox(self):
         bbox = [-10, -5, 10, 5]
         result = convert_bbox_to_geodf(bbox)

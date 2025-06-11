@@ -21,12 +21,12 @@
 
 import logging
 
-DATA_STORE_ID = "gedi"
+DATA_STORE_ID = "gedidb"
 
-GEDI_URL = "https://s3.gfz-potsdam.de"
-GEDI_S3_BUCKET_NAME = "dog.gedidb.gedi-l2-l4-v002"
+GEDIDB_URL = "https://s3.gfz-potsdam.de"
+GEDIDB_S3_BUCKET_NAME = "dog.gedidb.gedi-l2-l4-v002"
 
 NASA_CMR_URL = "https://cmr.earthdata.nasa.gov/search/collections.json?"
 
 # Logging
-LOG = logging.getLogger("xcube.gedi")
+LOG = logging.getLogger("xcube.gedidb")
