@@ -45,3 +45,34 @@ mamba install --channel conda-forge xcube-gedidb
 
 If xcube and any other necessary dependencies are not already installed, they
 will be installed automatically.
+
+
+## Testing
+
+To run the unit test suite:
+
+```bash
+pytest
+```
+
+## Some notes on the strategy of unit-testing for some tests
+
+The unit test suite
+uses [pytest-recording](https://pypi.org/project/pytest-recording/) to mock
+https requests via the Python
+library requests for some of the unit tests. During development an actual HTTP
+request is performed and the
+responses are saved in `cassettes/*.yaml` files. During testing, only the
+`cassettes/*.yaml` files are used without an actual HTTP request. During
+development, to save the responses to `cassettes/*.yaml`, run:
+
+```bash
+pytest -v -s --record-mode new_episodes
+```
+
+Note that --record-mode new_episodes overwrites all cassettes. If one only wants
+to write cassettes which are not saved already, --record-mode once can be used.
+pytest-recording supports all records modes given
+by [VCR.py](https://vcrpy.readthedocs.io/en/latest/usage.html#record-modes.
+After recording the
+cassettes, testing can be then performed as usual.

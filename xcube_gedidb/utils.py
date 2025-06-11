@@ -23,7 +23,7 @@ from typing import Sequence
 
 import geopandas as gpd
 from shapely.geometry import box
-from xcube.core.store import DataStoreError, DATASET_TYPE, DataTypeLike
+from xcube.core.store import DATASET_TYPE, DataStoreError, DataTypeLike
 
 
 def convert_bbox_to_geodf(bbox: Sequence[float]) -> gpd.GeoDataFrame:

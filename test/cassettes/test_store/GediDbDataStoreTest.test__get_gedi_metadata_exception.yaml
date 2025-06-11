@@ -1,0 +1,58 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.32.3
+    method: GET
+    uri: https://cmr.earthdata.nasa.gov/search/collections.json?concept_id=invalid_concept_id
+  response:
+    body:
+      string: '{"errors":["Concept-id [invalid_concept_id] is not valid."]}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      CMR-Request-Id:
+      - 9e6ae2c4-5dc4-4080-999f-80c9b9d52cb6
+      Connection:
+      - keep-alive
+      Content-MD5:
+      - bafd7af603c14702449b94277691add8
+      Content-SHA1:
+      - 44187118bdda9b09a09d4ad3237fc202b91d3893
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 11 Jun 2025 12:06:34 GMT
+      Server:
+      - ServerTokens ProductOnly
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 a71884ac07401af155dc18a13375cfb2.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - LrdI-wq4M-rsHgr8HM8pAGmQ-MVAsJ632nVhUEYFvGf9BYpf5IYSIQ==
+      X-Amz-Cf-Pop:
+      - MUC50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Request-Id:
+      - LrdI-wq4M-rsHgr8HM8pAGmQ-MVAsJ632nVhUEYFvGf9BYpf5IYSIQ==
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 400
+      message: Bad Request
+version: 1

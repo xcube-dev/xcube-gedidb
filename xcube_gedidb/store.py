@@ -19,27 +19,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Tuple, Iterator, Container, Any
+from typing import Any, Container, Iterator, Tuple
 
-import requests
-import xarray as xr
+import gedidb as gdb
 import numpy as np
 import pandas as pd
-import gedidb as gdb
+import requests
+import xarray as xr
 from requests import RequestException
-
-from xcube.core.store import DataDescriptor, DataStore, DataTypeLike, DATASET_TYPE
+from xcube.core.store import DATASET_TYPE, DataDescriptor, DataStore, DataTypeLike
 from xcube.util.jsonschema import (
-    JsonObjectSchema,
-    JsonStringSchema,
     JsonArraySchema,
+    JsonComplexSchema,
+    JsonDateSchema,
     JsonIntegerSchema,
     JsonNumberSchema,
-    JsonDateSchema,
-    JsonComplexSchema,
+    JsonObjectSchema,
+    JsonStringSchema,
 )
+
 from .constant import GEDIDB_S3_BUCKET_NAME, GEDIDB_URL, LOG, NASA_CMR_URL
-from .utils import convert_bbox_to_geodf, assert_valid_data_type
+from .utils import assert_valid_data_type, convert_bbox_to_geodf
 
 _GEDIDB_DATA_RETURN_TYPE = "xarray"
 

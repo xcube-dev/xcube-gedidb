@@ -22,8 +22,7 @@
 import unittest
 
 import geopandas as gpd
-from shapely.geometry import Polygon
-from shapely.geometry import box
+from shapely.geometry import Polygon, box
 
 from xcube_gedidb.utils import convert_bbox_to_geodf
 
