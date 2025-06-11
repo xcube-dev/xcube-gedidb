@@ -23,8 +23,8 @@ import unittest
 
 import gedidb
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
 from jsonschema.exceptions import ValidationError
 from requests import RequestException
 from xcube.core.store import DataDescriptor, new_data_store
@@ -171,6 +171,7 @@ class GediDbDataStoreTest(unittest.TestCase):
                 time_range=("2023-01-26", "2023-01-30"),
             )
 
+    @pytest.mark.vcr()
     def test__get_gedi_metadata_success(self):
         metadata = self.store._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get("L4A"))
         self.assertIsInstance(metadata, dict)
@@ -180,6 +181,7 @@ class GediDbDataStoreTest(unittest.TestCase):
             metadata.get("time_range"),
         )
 
+    @pytest.mark.vcr()
     def test__get_gedi_metadata_exception(self):
         with pytest.raises(RequestException, match="Failed to retrieve metadata"):
             self.store._get_gedi_metadata("invalid_concept_id")

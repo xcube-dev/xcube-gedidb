@@ -30,6 +30,7 @@ version = {attr = "xcube_gedidb.__version__"}
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-recording",
     "flake8"
 ]
 
