@@ -1,3 +1,3 @@
-## Changes in 0.1.0-dev (in development)
+## Changes in 0.1.0
 
 Initial version of GediDB Data Store.
