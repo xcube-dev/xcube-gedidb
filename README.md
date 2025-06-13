@@ -12,7 +12,7 @@ that enables access to datasets hosted by the
 The data store is called `"gedidb"` and implemented as
 an [xcube plugin](https://xcube.readthedocs.io/en/latest/plugins.html).
 It uses the [gedidb](https://gedidb.readthedocs.io/en/latest/)
-package under the hood.
+package, which is licensed under the [European Union Public License v1.2](https://github.com/simonbesnard1/gedidb/blob/main/LICENSE).
 
 ## Setup
 
