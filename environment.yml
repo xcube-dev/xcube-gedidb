@@ -1,4 +1,4 @@
-name: xcube-gedidb-test
+name: xcube-gedidb
 channels:
   - conda-forge
   - defaults
