@@ -267,7 +267,7 @@ class GediDbDataStore(DataStore):
             response = requests.get(url)
             response.raise_for_status()
         except requests.RequestException as e:
-            raise RequestException(f"Failed to retrieve metadata: {e}")
+            raise RequestException(f"Failed to retrieve metadata: {e}") from e
 
         data = response.json()
         entries = data.get("feed", {}).get("entry", [])

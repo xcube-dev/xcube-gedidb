@@ -171,6 +171,14 @@ class GediDbDataStoreTest(unittest.TestCase):
                 time_range=("2023-01-26", "2023-01-30"),
             )
 
+    def test_open_data_no_bbox_point(self):
+        with pytest.raises(ValidationError):
+            self.store.open_data(
+                data_id="L4C",
+                variables=["rh"],
+                time_range=("2023-01-26", "2023-01-30"),
+            )
+
     @pytest.mark.vcr()
     def test__get_gedi_metadata_success(self):
         metadata = self.store._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get("L4A"))

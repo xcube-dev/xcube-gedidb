@@ -8,6 +8,7 @@ dependencies:
   - xarray
   - xcube
   - pip
+  - gdal
   - pip:
       - gedidb
   # for testing
