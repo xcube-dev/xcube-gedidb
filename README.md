@@ -11,8 +11,10 @@ that enables access to datasets hosted by the
 [Global Ecosystem Dynamics Investigation (GEDI)](https://gedi.umd.edu/).
 The data store is called `"gedidb"` and implemented as
 an [xcube plugin](https://xcube.readthedocs.io/en/latest/plugins.html).
+
 It uses the [gedidb](https://gedidb.readthedocs.io/en/latest/)
-package, which is licensed under the [European Union Public License v1.2](https://github.com/simonbesnard1/gedidb/blob/main/LICENSE).
+package as a dependency, which is licensed under the 
+[European Union Public License v1.2](https://github.com/simonbesnard1/gedidb/blob/main/LICENSE).
 
 ## Setup
 
@@ -77,3 +79,10 @@ pytest-recording supports all records modes given
 by [VCR.py](https://vcrpy.readthedocs.io/en/latest/usage.html#record-modes.
 After recording the
 cassettes, testing can be then performed as usual.
+
+
+## Citation:
+This project uses the `gediDB` API (Besnard et al., 2025) as a dependency.
+
+Besnard, S., Dombrowski, F., & Holcomb, A. (2025). gediDB (2025.2.0). Zenodo. 
+https://doi.org/10.5281/zenodo.13885229

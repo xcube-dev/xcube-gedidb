@@ -6,6 +6,7 @@ This project depends on the following third-party component:
 The library is used unmodified and only via its public API.
 
 The `xcube-gedidb` package is not affiliated with the authors or maintainers 
-of [gedidb](https://gedidb.readthedocs.io/en/latest/).  
+of [gedidb](https://gedidb.readthedocs.io/en/latest/).
+
 It uses the [gedidb](https://gedidb.readthedocs.io/en/latest/user/api.html) API
 under the terms of the EUPL v1.2 license.
