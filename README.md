@@ -43,7 +43,7 @@ and you want to install `xcube-gedidb` into it.
 With the existing environment activated, execute this command:
 
 ```bash
-pip install xcube-gedi
+pip install xcube-gedidb
 ```
 
 If xcube and any other necessary dependencies are not already installed, they
