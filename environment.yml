@@ -12,7 +12,7 @@ dependencies:
   - pip
   - gdal
   - pip:
-      - gedidb
+      - gedidb >=v2026.11.19
   # for testing
   - black
   - flake8
