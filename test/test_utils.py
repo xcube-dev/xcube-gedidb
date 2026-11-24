@@ -23,8 +23,13 @@ import unittest
 
 import geopandas as gpd
 from shapely.geometry import Polygon, box
+from xcube.core.store import DataStoreError
 
-from xcube_gedidb.utils import convert_bbox_to_geodf
+from xcube_gedidb.utils import (
+    assert_valid_data_type,
+    convert_bbox_to_geodf,
+    is_valid_data_type,
+)
 
 
 class UtilsTest(unittest.TestCase):
@@ -41,3 +46,13 @@ class UtilsTest(unittest.TestCase):
 
         self.assertIsInstance(actual_geom, Polygon)
         self.assertEqual(expected_geom, actual_geom)
+
+    def test_data_type_validation(self):
+        self.assertTrue(is_valid_data_type(None))
+        self.assertTrue(is_valid_data_type("dataset"))
+        self.assertFalse(is_valid_data_type("geodataframe"))
+
+        with self.assertRaisesRegex(
+            DataStoreError, "Data type must be 'dataset'"
+        ):
+            assert_valid_data_type("geodataframe")

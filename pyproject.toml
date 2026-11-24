@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "xcube_gedidb"
 dynamic = ["version"]
 authors = [
-    {name = "Yogesh Kumar Baljeet Singh", email = "yogesh.baljeetsingh@brockmann-consult.de"}
+    {name = "Yogesh Kumar Baljeet Singh", email = "yogesh.baljeetsingh@brockmann-consult.de"},
     {name = "Konstantin Ntokas", email = "konstantin.ntokas@brockmann-consult.de"}
 ]
 description = """\

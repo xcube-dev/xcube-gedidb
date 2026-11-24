@@ -318,7 +318,10 @@ class GediDbDataStore(DataStore):
         time_end = entry.get("time_end")
         time_range = (time_start, time_end)
 
-        return {"bbox": tuple(bbox), "time_range": tuple(time_range)}
+        return {
+            "bbox": tuple(bbox) if bbox is not None else None,
+            "time_range": tuple(time_range),
+        }
 
     def _get_available_variables(
         self,

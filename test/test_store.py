@@ -30,7 +30,12 @@ from requests import RequestException
 from xcube.core.store import DataDescriptor, new_data_store
 from xcube.util.jsonschema import JsonObjectSchema
 
-from xcube_gedidb.store import GediDbDataStore, _GEDI_PRODUCT_CONCEPT_IDS
+from xcube_gedidb.constant import GEDIDB_S3_BUCKET_NAME, GEDIDB_URL
+from xcube_gedidb.store import (
+    GediDbDataStore,
+    _GEDI_PRODUCT_CONCEPT_IDS,
+    _create_provider,
+)
 
 
 _AVAILABLE_VARIABLES = pd.DataFrame(
@@ -94,6 +99,20 @@ class GediDbDataStoreTest(unittest.TestCase):
         )
         self.create_provider.assert_called_once()
 
+    @patch("xcube_gedidb.store.import_module")
+    def test_create_provider(self, import_module):
+        provider = _create_provider()
+
+        import_module.assert_called_once_with("gedidb")
+        import_module.return_value.GEDIProvider.assert_called_once_with(
+            storage_type="s3",
+            s3_bucket=GEDIDB_S3_BUCKET_NAME,
+            url=GEDIDB_URL,
+        )
+        self.assertIs(
+            provider, import_module.return_value.GEDIProvider.return_value
+        )
+
     def test_get_data_store_params_schema(self):
         schema = self.store.get_data_store_params_schema()
         self.assertIsInstance(schema, JsonObjectSchema)
@@ -106,6 +125,13 @@ class GediDbDataStoreTest(unittest.TestCase):
         types = self.store.get_data_types()
         self.assertIsInstance(types, tuple)
         self.assertEqual(("dataset",), types)
+
+    def test_get_data_types_for_data(self):
+        self.assertEqual(
+            ("dataset",), self.store.get_data_types_for_data("L2A")
+        )
+        with pytest.raises(ValueError, match="Invalid data_id provided"):
+            self.store.get_data_types_for_data("invalid")
 
     def test_get_data_ids_without_attrs(self):
         data_ids = list(self.store.get_data_ids())
@@ -171,6 +197,15 @@ class GediDbDataStoreTest(unittest.TestCase):
         self.assertIn("num_shots", schema_dict["oneOf"][1]["properties"])
         self.assertIn("radius", schema_dict["oneOf"][1]["properties"])
 
+    def test_get_open_data_params_schema_for_product_and_opener(self):
+        schema = self.store.get_open_data_params_schema(
+            data_id="L2A", opener_id="ignored"
+        )
+        variable_schema = schema.to_dict()["oneOf"][0]["properties"][
+            "variables"
+        ]
+        self.assertEqual(["rh"], variable_schema["items"]["enum"])
+
     def test_open_data_with_bbox(self):
         ds = self.store.open_data(
             data_id="L2A",
@@ -222,6 +257,24 @@ class GediDbDataStoreTest(unittest.TestCase):
         )
         self.assertIsInstance(ds, xr.Dataset)
 
+    def test_open_data_uses_product_variables_by_default(self):
+        self.store.open_data(
+            data_id="L2A",
+            point=(-112.15, 50.69),
+            time_range=("2023-01-26", "2023-01-30"),
+        )
+
+        self.provider.get_data.assert_called_once_with(
+            variables=["rh"],
+            query_type="nearest",
+            point=(-112.15, 50.69),
+            num_shots=10,
+            radius=0.1,
+            start_time="2023-01-26",
+            end_time="2023-01-30",
+            return_type="xarray",
+        )
+
     def test_open_data_invalid_data_id(self):
         with pytest.raises(ValueError):
             self.store.open_data(
@@ -255,6 +308,46 @@ class GediDbDataStoreTest(unittest.TestCase):
     def test__get_gedi_metadata_exception(self):
         with pytest.raises(RequestException, match="Failed to retrieve metadata"):
             self.store._get_gedi_metadata("invalid_concept_id")
+
+    @patch("xcube_gedidb.store.requests.get")
+    def test__get_gedi_metadata_no_entries(self, get):
+        get.return_value.json.return_value = {"feed": {"entry": []}}
+
+        with pytest.raises(ValueError, match="No entries found"):
+            self.store._get_gedi_metadata("concept_id")
+
+    @patch("xcube_gedidb.store.requests.get")
+    def test__get_gedi_metadata_without_bbox(self, get):
+        get.return_value.json.return_value = {
+            "feed": {
+                "entry": [
+                    {
+                        "time_start": "2019-04-17T00:00:00.000Z",
+                        "time_end": "2024-11-27T23:59:59.999Z",
+                    }
+                ]
+            }
+        }
+
+        metadata = self.store._get_gedi_metadata("concept_id")
+
+        self.assertIsNone(metadata["bbox"])
+        self.assertEqual(
+            ("2019-04-17T00:00:00.000Z", "2024-11-27T23:59:59.999Z"),
+            metadata["time_range"],
+        )
+
+    def test_get_search_params_schema(self):
+        self.assertIsInstance(self.store.get_search_params_schema(), JsonObjectSchema)
+
+    def test_get_available_variables(self):
+        pd.testing.assert_frame_equal(
+            _AVAILABLE_VARIABLES, self.store._get_available_variables("all")
+        )
+        pd.testing.assert_frame_equal(
+            _AVAILABLE_VARIABLES.loc[["cover"]],
+            self.store._get_available_variables("L2B"),
+        )
 
     def test_search_data_not_implemented(self):
         with pytest.raises(NotImplementedError):
