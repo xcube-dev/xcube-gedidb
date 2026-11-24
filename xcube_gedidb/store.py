@@ -176,7 +176,7 @@ class GediDbDataStore(DataStore):
                         JsonNumberSchema(minimum=-90, maximum=90),
                     ),
                     description="A bounding box in the form of "
-                    "(xmin, ymin, xmax, ymax).",
+                    "(west, south, east, north) in degrees.",
                 ),
                 **common_schema,
             ),
