@@ -19,9 +19,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Any, Container, Iterator, Tuple
+from importlib import import_module
+from threading import Lock
+from typing import Any, ClassVar, Container, Iterator, Tuple
 
-import gedidb as gdb
 import numpy as np
 import pandas as pd
 import requests
@@ -61,20 +62,49 @@ _GEDI_PRODUCT_CONCEPT_IDS = {
 }
 
 
+def _create_provider():
+    """Create the provider only when data or variable metadata is needed."""
+    return import_module("gedidb").GEDIProvider(
+        storage_type="s3", s3_bucket=GEDIDB_S3_BUCKET_NAME, url=GEDIDB_URL
+    )
+
+
 class GediDbDataStore(DataStore):
     """Implementation of GediDB data store ."""
 
+    # Variable metadata is read from the remote TileDB array. It is common for
+    # xcube to create several store instances in one process (and for tests to
+    # do so for every test case), although that metadata is the same for all of
+    # them. Keep one process-local copy and give every store its own DataFrame.
+    _available_variables_cache: ClassVar[pd.DataFrame | None] = None
+    _available_variables_lock = Lock()
+
     def __init__(self):
-        self.provider = gdb.GEDIProvider(
-            storage_type="s3", s3_bucket=GEDIDB_S3_BUCKET_NAME, url=GEDIDB_URL
-        )
-        self.all_supported_variables: pd.DataFrame = (
-            self.provider.get_available_variables()
-        )
-        self.data_ids: list[str] = list(
-            self.all_supported_variables["product_level"].unique()
-        )
-        self.data_ids.append("all")
+        # Constructing a provider and reading its TileDB metadata can require
+        # several S3 round trips. Neither is necessary to list the supported
+        # GEDI products, so defer both until a variable list or data is needed.
+        self._provider = None
+        self._all_supported_variables: pd.DataFrame | None = None
+        self.data_ids = [*_GEDI_PRODUCT_CONCEPT_IDS, "all"]
+
+    @property
+    def provider(self):
+        if self._provider is None:
+            self._provider = _create_provider()
+        return self._provider
+
+    @property
+    def all_supported_variables(self) -> pd.DataFrame:
+        if self._all_supported_variables is None:
+            with self._available_variables_lock:
+                cached_variables = self._available_variables_cache
+                if cached_variables is None:
+                    cached_variables = self.provider.get_available_variables()
+                    type(self)._available_variables_cache = cached_variables
+            # The DataFrame is publicly accessible, so do not expose the
+            # process-wide cache to accidental mutation by a caller.
+            self._all_supported_variables = cached_variables.copy(deep=True)
+        return self._all_supported_variables
 
     @classmethod
     def get_data_store_params_schema(cls) -> JsonObjectSchema:
@@ -209,11 +239,11 @@ class GediDbDataStore(DataStore):
         opener_id: str = None,
         **open_params,
     ) -> xr.Dataset:
-        schema = self.get_open_data_params_schema()
-        schema.validate_instance(open_params)
-
         if not self.has_data(data_id):
             raise ValueError(f"data_id {data_id} is invalid.")
+
+        schema = self.get_open_data_params_schema()
+        schema.validate_instance(open_params)
 
         vars_selected = open_params.get("variables")
         if vars_selected is None:

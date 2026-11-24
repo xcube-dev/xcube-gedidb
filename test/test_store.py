@@ -20,8 +20,8 @@
 # SOFTWARE.
 
 import unittest
+from unittest.mock import Mock, patch
 
-import gedidb
 import pandas as pd
 import pytest
 import xarray as xr
@@ -30,18 +30,69 @@ from requests import RequestException
 from xcube.core.store import DataDescriptor, new_data_store
 from xcube.util.jsonschema import JsonObjectSchema
 
-from xcube_gedidb.store import _GEDI_PRODUCT_CONCEPT_IDS
+from xcube_gedidb.store import GediDbDataStore, _GEDI_PRODUCT_CONCEPT_IDS
+
+
+_AVAILABLE_VARIABLES = pd.DataFrame(
+    {"product_level": ["L2A", "L2B", "L4A", "L4C"]},
+    index=["rh", "cover", "agbd", "wsci"],
+)
+
+
+def _sample_dataset() -> xr.Dataset:
+    return xr.Dataset(
+        data_vars={"rh": ("shot_number", [1.0])},
+        coords={
+            "profile_points": [0],
+            "shot_number": [1],
+            "latitude": ("shot_number", [50.69]),
+            "longitude": ("shot_number", [-112.15]),
+            "time": ("shot_number", ["2023-01-27"]),
+        },
+    )
 
 
 class GediDbDataStoreTest(unittest.TestCase):
     def setUp(self):
+        # These are unit tests. Do not make TileDB/S3 requests merely to create
+        # a store or validate its schemas.
+        GediDbDataStore._available_variables_cache = None
+        self.provider = Mock()
+        self.provider.get_available_variables.return_value = (
+            _AVAILABLE_VARIABLES
+        )
+        self.provider.get_data.side_effect = lambda **_: _sample_dataset()
+        self.provider_factory = patch(
+            "xcube_gedidb.store._create_provider", return_value=self.provider
+        )
+        self.create_provider = self.provider_factory.start()
         self.store = new_data_store("gedidb")
+
+    def tearDown(self):
+        self.provider_factory.stop()
 
     def test_init(self):
         self.assertEqual(5, len(self.store.data_ids))
         self.assertIn("all", self.store.data_ids)
-        self.assertIsInstance(self.store.provider, gedidb.GEDIProvider)
+        self.assertIs(self.store.provider, self.provider)
         self.assertIsInstance(self.store.all_supported_variables, pd.DataFrame)
+
+    def test_init_defers_provider_creation_and_reuses_metadata(self):
+        self.create_provider.assert_not_called()
+
+        self.assertIsInstance(self.store.all_supported_variables, pd.DataFrame)
+        self.create_provider.assert_called_once()
+        self.provider.get_available_variables.assert_called_once()
+
+        another_store = new_data_store("gedidb")
+        self.assertIsInstance(
+            another_store.all_supported_variables, pd.DataFrame
+        )
+        self.assertIsNot(
+            another_store.all_supported_variables,
+            self.store.all_supported_variables,
+        )
+        self.create_provider.assert_called_once()
 
     def test_get_data_store_params_schema(self):
         schema = self.store.get_data_store_params_schema()
@@ -77,7 +128,18 @@ class GediDbDataStoreTest(unittest.TestCase):
         self.assertFalse(self.store.has_data("johndoe"))
 
     def test_describe_data_valid(self):
-        desc = self.store.describe_data("L4A")
+        with patch.object(
+            GediDbDataStore,
+            "_get_gedi_metadata",
+            return_value={
+                "bbox": (-53.0, -180.0, 55.7983, 180.0),
+                "time_range": (
+                    "2019-04-17T00:00:00.000Z",
+                    "2024-11-27T23:59:59.999Z",
+                ),
+            },
+        ):
+            desc = self.store.describe_data("L4A")
         self.assertIsInstance(desc, DataDescriptor)
         self.assertEqual("L4A", desc.data_id)
         self.assertEqual((-53.0, -180.0, 55.7983, 180.0), desc.bbox)
