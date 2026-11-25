@@ -19,12 +19,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from importlib import import_module
-from threading import Lock
-from typing import Any, ClassVar, Container, Iterator, Tuple
+from collections.abc import Container, Iterator
+from typing import Any
 
+import gedidb
 import numpy as np
-import pandas as pd
 import requests
 import xarray as xr
 from requests import RequestException
@@ -39,17 +38,17 @@ from xcube.util.jsonschema import (
     JsonStringSchema,
 )
 
-from .constant import GEDIDB_S3_BUCKET_NAME, GEDIDB_URL, LOG, NASA_CMR_URL
+from .constant import (
+    GEDI_PRODUCT_LEVELS_DESCRIPTION,
+    GEDIDB_S3_BUCKET_NAME,
+    GEDIDB_URL,
+    LOG,
+    NASA_CMR_URL,
+    SUPPORTED_VARIABLES,
+)
 from .utils import assert_valid_data_type, convert_bbox_to_geodf
 
 _GEDIDB_DATA_RETURN_TYPE = "xarray"
-
-_GEDI_PRODUCT_LEVELS_DESCRIPTION = {
-    "L2A": "Geolocated waveform data and relative height metrics.",
-    "L2B": "Vegetation canopy cover and vertical profile metrics.",
-    "L4A": "Aboveground biomass density estimates.",
-    "L4C": "Gridded biomass estimates at global scales.",
-}
 
 
 # These concept IDs are required by the NASA CMR API to return the metadata
@@ -62,62 +61,29 @@ _GEDI_PRODUCT_CONCEPT_IDS = {
 }
 
 
-def _create_provider():
-    """Create the provider only when data or variable metadata is needed."""
-    return import_module("gedidb").GEDIProvider(
-        storage_type="s3", s3_bucket=GEDIDB_S3_BUCKET_NAME, url=GEDIDB_URL
-    )
-
-
 class GediDbDataStore(DataStore):
     """Implementation of GediDB data store ."""
-
-    # Variable metadata is read from the remote TileDB array. It is common for
-    # xcube to create several store instances in one process (and for tests to
-    # do so for every test case), although that metadata is the same for all of
-    # them. Keep one process-local copy and give every store its own DataFrame.
-    _available_variables_cache: ClassVar[pd.DataFrame | None] = None
-    _available_variables_lock = Lock()
 
     def __init__(self):
         # Constructing a provider and reading its TileDB metadata can require
         # several S3 round trips. Neither is necessary to list the supported
         # GEDI products, so defer both until a variable list or data is needed.
-        self._provider = None
-        self._all_supported_variables: pd.DataFrame | None = None
-        self.data_ids = [*_GEDI_PRODUCT_CONCEPT_IDS, "all"]
-
-    @property
-    def provider(self):
-        if self._provider is None:
-            self._provider = _create_provider()
-        return self._provider
-
-    @property
-    def all_supported_variables(self) -> pd.DataFrame:
-        if self._all_supported_variables is None:
-            with self._available_variables_lock:
-                cached_variables = self._available_variables_cache
-                if cached_variables is None:
-                    cached_variables = self.provider.get_available_variables()
-                    type(self)._available_variables_cache = cached_variables
-            # The DataFrame is publicly accessible, so do not expose the
-            # process-wide cache to accidental mutation by a caller.
-            self._all_supported_variables = cached_variables.copy(deep=True)
-        return self._all_supported_variables
+        self.provider = gedidb.GEDIProvider(
+            storage_type="s3", s3_bucket=GEDIDB_S3_BUCKET_NAME, url=GEDIDB_URL
+        )
+        self.variables = SUPPORTED_VARIABLES
+        self.data_ids = [*GEDI_PRODUCT_LEVELS_DESCRIPTION, "all"]
 
     @classmethod
     def get_data_store_params_schema(cls) -> JsonObjectSchema:
         LOG.info("This data store can be initialized without any params")
-        return JsonObjectSchema(
-            additional_properties=False,
-        )
+        return JsonObjectSchema(additional_properties=False)
 
     @classmethod
-    def get_data_types(cls) -> Tuple[str, ...]:
+    def get_data_types(cls) -> tuple[str, ...]:
         return (DATASET_TYPE.alias,)
 
-    def get_data_types_for_data(self, data_id: str) -> Tuple[str, ...]:
+    def get_data_types_for_data(self, data_id: str) -> tuple[str, ...]:
         if data_id in self.data_ids:
             return self.get_data_types()
         raise ValueError("Invalid data_id provided")
@@ -136,11 +102,9 @@ class GediDbDataStore(DataStore):
             else:
                 yield data_id
 
-    def has_data(self, data_id: str, data_type: str = None) -> bool:
+    def has_data(self, data_id: str, data_type: str | None = None) -> bool:
         assert_valid_data_type(data_type)
-        if data_id in self.data_ids:
-            return True
-        return False
+        return data_id in self.data_ids
 
     def describe_data(
         self, data_id: str, data_type: DataTypeLike = None
@@ -162,8 +126,8 @@ class GediDbDataStore(DataStore):
         return DataDescriptor(data_id, data_type, **metadata)
 
     def get_data_opener_ids(
-        self, data_id: str = None, data_type: DataTypeLike = None
-    ) -> Tuple[str, ...]:
+        self, data_id: str | None = None, data_type: DataTypeLike = None
+    ) -> tuple[str, ...]:
         raise NotImplementedError(
             "Since we use gedidb to request the data, which has already been "
             "converted from HDF5 to TileDB arrays, there are no data opener "
@@ -171,30 +135,30 @@ class GediDbDataStore(DataStore):
         )
 
     def get_open_data_params_schema(
-        self, data_id: str = None, opener_id: str = None
+        self, data_id: str | None = None, opener_id: str | None = None
     ) -> JsonComplexSchema:
         if opener_id:
             LOG.warning(
                 "`opener_id` is ignored since only one way to open the data exists."
             )
         if data_id:
-            possible_variables = self._get_available_variables(data_id)
+            possible_variables = self._get_product_level_variables(data_id)
         else:
-            possible_variables = self.all_supported_variables
+            possible_variables = list(self.variables.keys())
 
-        common_schema = dict(
-            variables=JsonArraySchema(
+        common_schema = {
+            "variables": JsonArraySchema(
                 items=(
                     JsonStringSchema(
                         min_length=0,
-                        enum=list(possible_variables.index),
+                        enum=possible_variables,
                     )
                 ),
                 unique_items=True,
                 description="List of variables to retrieve from the database.",
             ),
-            time_range=JsonDateSchema.new_range(),
-        )
+            "time_range": JsonDateSchema.new_range(),
+        }
 
         bbox_schema = JsonObjectSchema(
             properties=dict(
@@ -236,7 +200,7 @@ class GediDbDataStore(DataStore):
     def open_data(
         self,
         data_id: str,
-        opener_id: str = None,
+        opener_id: str | None = None,
         **open_params,
     ) -> xr.Dataset:
         if not self.has_data(data_id):
@@ -247,12 +211,10 @@ class GediDbDataStore(DataStore):
 
         vars_selected = open_params.get("variables")
         if vars_selected is None:
-            vars_selected = list(self._get_available_variables(data_id).index)
+            vars_selected = self._get_product_level_variables(data_id)
 
         bbox = open_params.get("bbox", [])
-
         start_time, end_time = open_params.get("time_range")
-
         point = open_params.get("point")
         num_shots = open_params.get("num_shots", 10)
         radius = open_params.get("radius", 0.1)
@@ -291,7 +253,7 @@ class GediDbDataStore(DataStore):
         raise NotImplementedError("search_data() operation is not supported.")
 
     @staticmethod
-    def _get_gedi_metadata(concept_id: str) -> dict[str, tuple[Any]]:
+    def _get_gedi_metadata(concept_id: str) -> dict:
         url = f"{NASA_CMR_URL}concept_id={concept_id}"
         try:
             response = requests.get(url)
@@ -323,12 +285,7 @@ class GediDbDataStore(DataStore):
             "time_range": tuple(time_range),
         }
 
-    def _get_available_variables(
-        self,
-        product_level: str,
-    ) -> pd.DataFrame:
+    def _get_product_level_variables(self, product_level: str) -> list:
         if product_level == "all":
-            return self.all_supported_variables
-        return self.all_supported_variables[
-            self.all_supported_variables["product_level"] == product_level
-        ]
+            return list(self.variables.keys())
+        return [key for key, val in self.variables.items() if val == product_level]

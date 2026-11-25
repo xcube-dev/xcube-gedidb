@@ -52,7 +52,5 @@ class UtilsTest(unittest.TestCase):
         self.assertTrue(is_valid_data_type("dataset"))
         self.assertFalse(is_valid_data_type("geodataframe"))
 
-        with self.assertRaisesRegex(
-            DataStoreError, "Data type must be 'dataset'"
-        ):
+        with self.assertRaisesRegex(DataStoreError, "Data type must be 'dataset'"):
             assert_valid_data_type("geodataframe")
