@@ -5,43 +5,12 @@ on:
     types: [ published ]
 
 jobs:
-  unittest:
+  deploy:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
 
     steps:
-      - name: checkout xcube-gedidb
-        uses: actions/checkout@v4
-
-      - name: Set up MicroMamba
-        uses: mamba-org/setup-micromamba@v1
-        with:
-          environment-file: environment.yml
-          create-args: >-
-            python=${{ matrix.python-version }}
-
-      - name: Run tests and create coverage report
-        shell: bash -l {0}
-        run:
-          pytest test/ --cov=xcube_gedidb --cov-report=xml
-
-      - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          verbose: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  PyPi-Deploy:
-    name: Publish Python Package to PyPI
-    runs-on: ubuntu-latest
-    needs: unittest
-
-    steps:
-      - name: checkout xcube-gedidb
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -57,9 +26,11 @@ jobs:
         run: |
           python -m build
 
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          verbose: true
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          pip install twine
+          twine check dist/*
+          python -m twine upload dist/*
