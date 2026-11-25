@@ -35,7 +35,7 @@ from xcube_gedidb.constant import (
     GEDIDB_URL,
     SUPPORTED_VARIABLES,
 )
-from xcube_gedidb.store import _GEDI_PRODUCT_CONCEPT_IDS, GediDbDataStore
+from xcube_gedidb.store import GEDI_PRODUCT_CONCEPT_IDS, GediDbDataStore
 
 
 def _sample_dataset() -> xr.Dataset:
@@ -257,11 +257,11 @@ class GediDbDataStoreTest(unittest.TestCase):
 
     @pytest.mark.vcr()
     def test__get_gedi_metadata_success(self):
-        metadata = self.store._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get("L4A"))
+        metadata = self.store._get_gedi_metadata(GEDI_PRODUCT_CONCEPT_IDS.get("L4A"))
         self.assertIsInstance(metadata, dict)
-        self.assertEqual((-53.0, -180.0, 55.7983, 180.0), metadata.get("bbox"))
+        self.assertEqual((-53.0, -180.0, 56.0, 180.0), metadata.get("bbox"))
         self.assertEqual(
-            ("2019-04-17T00:00:00.000Z", "2024-11-27T23:59:59.999Z"),
+            ("2019-04-04T00:00:00.000Z", None),
             metadata.get("time_range"),
         )
 

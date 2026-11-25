@@ -38,6 +38,14 @@ GEDI_PRODUCT_LEVELS_DESCRIPTION = {
     "L4A": "Aboveground biomass density estimates.",
     "L4C": "Gridded biomass estimates at global scales.",
 }
+# These concept IDs are required by the NASA CMR API to return the metadata
+# for the requested processed level GEDI data
+GEDI_PRODUCT_CONCEPT_IDS = {
+    "L2A": "C3974616071-LPCLOUD",
+    "L2B": "C3974616135-LPCLOUD",
+    "L4A": "C4212593885-ORNL_CLOUD",
+    "L4C": "C4302347663-ORNL_CLOUD",
+}
 SUPPORTED_VARIABLES = {
     "agbd": "L4A",
     "agbd_a1": "L4A",

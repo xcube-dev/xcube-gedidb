@@ -39,6 +39,7 @@ from xcube.util.jsonschema import (
 )
 
 from .constant import (
+    GEDI_PRODUCT_CONCEPT_IDS,
     GEDI_PRODUCT_LEVELS_DESCRIPTION,
     GEDIDB_S3_BUCKET_NAME,
     GEDIDB_URL,
@@ -49,16 +50,6 @@ from .constant import (
 from .utils import assert_valid_data_type, convert_bbox_to_geodf
 
 _GEDIDB_DATA_RETURN_TYPE = "xarray"
-
-
-# These concept IDs are required by the NASA CMR API to return the metadata
-# for the requested processed level GEDI data
-_GEDI_PRODUCT_CONCEPT_IDS = {
-    "L2A": "C2142771958-LPCLOUD",
-    "L2B": "C2142776747-LPCLOUD",
-    "L4A": "C2237824918-ORNL_CLOUD",
-    "L4C": "C3049900163-ORNL_CLOUD",
-}
 
 
 class GediDbDataStore(DataStore):
@@ -121,7 +112,7 @@ class GediDbDataStore(DataStore):
             )
 
         metadata = dict(
-            **self._get_gedi_metadata(_GEDI_PRODUCT_CONCEPT_IDS.get(data_id))
+            **self._get_gedi_metadata(GEDI_PRODUCT_CONCEPT_IDS.get(data_id))
         )
         return DataDescriptor(data_id, data_type, **metadata)
 
