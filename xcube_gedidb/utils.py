@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import geopandas as gpd
 from shapely.geometry import box
@@ -27,7 +27,7 @@ from xcube.core.store import DATASET_TYPE, DataStoreError, DataTypeLike
 
 
 def convert_bbox_to_geodf(bbox: Sequence[float]) -> gpd.GeoDataFrame:
-    return gpd.GeoDataFrame({"geometry": [box(*bbox)]})
+    return gpd.GeoDataFrame(geometry=[box(*bbox)], crs="EPSG:4326")
 
 
 def assert_valid_data_type(data_type: DataTypeLike):

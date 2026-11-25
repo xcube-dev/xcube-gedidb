@@ -4,13 +4,15 @@ channels:
   - defaults
 dependencies:
   # Required
-  - python>=3.10
+  # gedidb currently cannot be imported with Python 3.14 (Numba caching).
+  # This also matches the versions tested in CI.
+  - python>=3.11,<3.14
   - xarray
   - xcube
   - pip
   - gdal
   - pip:
-      - gedidb
+      - gedidb >=v2026.11.19
   # for testing
   - black
   - flake8
